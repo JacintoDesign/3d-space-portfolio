@@ -119,6 +119,10 @@ export default function App() {
         g.togglePhotoMode()
       } else if ((e.code === 'KeyE' || e.code === 'Enter') && g.mode === 'play' && g.nearTarget) {
         g.openOverlay(g.nearTarget)
+      } else if (e.code === 'KeyB' && g.mode === 'play' && g.zone === 'void' && g.voidWarp) {
+        g.dropOutOfWarp()
+      } else if (e.code === 'Space' && g.mode === 'play' && g.zone === 'void' && !typing) {
+        e.preventDefault()
       }
     }
     window.addEventListener('keydown', onKey)

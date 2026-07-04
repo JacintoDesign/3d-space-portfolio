@@ -1,24 +1,15 @@
-import { useEffect, useRef, type RefObject } from 'react'
+import { useRef, type RefObject } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import { useShip } from '../store/useShip'
 import { useGame } from '../store/useGame'
 import { landmarkById } from '../data/world'
-import { cameraDrag } from './cameraDrag'
 
 const DIST = 9
 const HEIGHT = 3
 const LOOK_AHEAD = 10
 const BASE_FOV = 60
 const BOOST_FOV = 70
-
-// Drag-to-orbit (desktop "mouse is for the camera"): press + drag on the canvas
-// to swing the chase camera around the ship; it eases back behind on release.
-const ORBIT_SENS = 0.006 // rad per px dragged
-const ORBIT_PITCH_MIN = -0.5
-const ORBIT_PITCH_MAX = 1.15
-const ORBIT_RETURN = 1.8 // how fast the view eases back behind the ship
-const DRAG_THRESHOLD = 6 // px before a press is a camera drag, not a station click
 
 // Cinematic orbit (About/Contact): a slow turntable around the ship so it reads
 // from many angles — level, side, high near-top-down — while it warps along.
@@ -63,74 +54,21 @@ const side = new THREE.Vector3()
 const camFwd = new THREE.Vector3()
 const stationPos = new THREE.Vector3()
 const heroVec = new THREE.Vector3()
-const qTmp = new THREE.Quaternion()
 const WORLD_UP = new THREE.Vector3(0, 1, 0)
 
 export function ChaseCamera({ targetRef }: { targetRef: RefObject<THREE.Group | null> }) {
   const camera = useThree((s) => s.camera) as THREE.PerspectiveCamera
-  const gl = useThree((s) => s.gl)
   const fov = useRef(BASE_FOV)
   const dist = useRef(DIST)
   const height = useRef(HEIGHT)
   const time = useRef(0)
   const curLook = useRef(new THREE.Vector3())
   const inited = useRef(false)
-  const orbitYaw = useRef(0)
-  const orbitPitch = useRef(0)
-  const dragging = useRef(false)
   const prevMode = useRef('loading')
   const introUntil = useRef(0)
   const pendingSnap = useRef(false)
-
-  // Drag-to-orbit the camera. A press that never moves past the threshold stays
-  // a click (station travel); a drag past it orbits and suppresses that click.
-  useEffect(() => {
-    const el = gl.domElement
-    let active = false
-    let downX = 0
-    let downY = 0
-    let lastX = 0
-    let lastY = 0
-    const onDown = (e: PointerEvent) => {
-      if (e.button !== 0 || useGame.getState().mode !== 'play') return
-      active = true
-      dragging.current = false
-      cameraDrag.moved = false
-      downX = lastX = e.clientX
-      downY = lastY = e.clientY
-    }
-    const onMove = (e: PointerEvent) => {
-      if (!active) return
-      const dx = e.clientX - lastX
-      const dy = e.clientY - lastY
-      lastX = e.clientX
-      lastY = e.clientY
-      if (!dragging.current && Math.hypot(e.clientX - downX, e.clientY - downY) > DRAG_THRESHOLD) {
-        dragging.current = true
-        cameraDrag.moved = true
-      }
-      if (dragging.current) {
-        orbitYaw.current += dx * ORBIT_SENS
-        orbitPitch.current = THREE.MathUtils.clamp(
-          orbitPitch.current + dy * ORBIT_SENS,
-          ORBIT_PITCH_MIN,
-          ORBIT_PITCH_MAX,
-        )
-      }
-    }
-    const onUp = () => {
-      active = false
-      dragging.current = false
-    }
-    el.addEventListener('pointerdown', onDown)
-    window.addEventListener('pointermove', onMove)
-    window.addEventListener('pointerup', onUp)
-    return () => {
-      el.removeEventListener('pointerdown', onDown)
-      window.removeEventListener('pointermove', onMove)
-      window.removeEventListener('pointerup', onUp)
-    }
-  }, [gl])
+  const homeSnap = useRef(false)
+  const homeTick = useRef(0)
 
   useFrame((_, dRaw) => {
     const ship = targetRef.current
@@ -143,6 +81,15 @@ export function ChaseCamera({ targetRef }: { targetRef: RefObject<THREE.Group | 
     const reduced = g.reducedMotion
     const cinematic = m === 'about' || m === 'contact'
     const parkedLm = m === 'play' && g.parked ? landmarkById(g.parked) : null
+
+    if (g.homeTick !== homeTick.current) {
+      homeTick.current = g.homeTick
+      dist.current = DIST
+      height.current = HEIGHT
+      introUntil.current = 0
+      homeSnap.current = true
+      inited.current = false
+    }
 
     // Kick off the one-time intro fly-in the frame we leave the loader.
     if (prevMode.current === 'loading' && m === 'play' && !reduced) {
@@ -188,22 +135,8 @@ export function ChaseCamera({ targetRef }: { targetRef: RefObject<THREE.Group | 
       const ke = 1 - Math.exp(-3 * delta)
       dist.current += (DIST - dist.current) * ke
       height.current += (HEIGHT - height.current) * ke
-      // Ease the mouse-orbit back behind the ship when not dragging.
-      if (!dragging.current) {
-        const d = Math.exp(-ORBIT_RETURN * delta)
-        orbitYaw.current *= d
-        orbitPitch.current *= d
-      }
-      // Base chase offset (behind + above), then swing it by the mouse-orbit.
+      // Locked chase: behind + above the ship, following its heading.
       desired.set(0, 0, 0).addScaledVector(back, dist.current).addScaledVector(up, height.current)
-      qTmp.setFromAxisAngle(WORLD_UP, orbitYaw.current)
-      desired.applyQuaternion(qTmp)
-      side.crossVectors(desired, WORLD_UP)
-      if (side.lengthSq() > 1e-6) {
-        side.normalize()
-        qTmp.setFromAxisAngle(side, orbitPitch.current)
-        desired.applyQuaternion(qTmp)
-      }
       desired.add(ship.position)
     }
 
@@ -218,7 +151,12 @@ export function ChaseCamera({ targetRef }: { targetRef: RefObject<THREE.Group | 
     }
 
     const posRate = cinematic ? 8 : parkedLm ? 4.5 : 6
-    camera.position.lerp(desired, 1 - Math.exp(-posRate * delta))
+    if (homeSnap.current && !cinematic && !parkedLm) {
+      camera.position.copy(desired)
+      homeSnap.current = false
+    } else {
+      camera.position.lerp(desired, 1 - Math.exp(-posRate * delta))
+    }
 
     // --- look target ---
     if (cinematic) {
@@ -238,13 +176,7 @@ export function ChaseCamera({ targetRef }: { targetRef: RefObject<THREE.Group | 
     } else if (parkedLm) {
       look.copy(stationPos)
     } else {
-      // Look ahead of the ship normally, but pull the aim back toward the ship
-      // as the mouse-orbit swings out so it stays framed from any angle.
-      const orbitMag = Math.min(1, (Math.abs(orbitYaw.current) + Math.abs(orbitPitch.current)) / 1.2)
-      look
-        .copy(ship.position)
-        .addScaledVector(fwd, LOOK_AHEAD * (1 - 0.75 * orbitMag))
-        .addScaledVector(up, 0.5)
+      look.copy(ship.position).addScaledVector(fwd, LOOK_AHEAD).addScaledVector(up, 0.5)
     }
 
     // Eased look target for smooth mode transitions. The cinematic pins exactly

@@ -5,7 +5,7 @@ import type { Landmark } from '../data/world'
 import { useGame } from '../store/useGame'
 import { projectById } from '../data/projects'
 import { MODEL_URLS, useFittedModel } from '../scene/models'
-import { cameraDrag } from '../ship/cameraDrag'
+import { pointerSteer } from '../ship/pointerSteer'
 import { StationSign } from './StationSign'
 import { HoloScreen } from './HoloScreen'
 
@@ -77,10 +77,10 @@ export function Station({ landmark }: { landmark: Landmark }) {
   const model = useFittedModel(MODEL_URLS.station, R * 2.5)
 
   // Click anywhere on the station to autopilot straight to it (unless the press
-  // was a camera drag). Cursor turns to a pointer on hover.
+  // was a steer drag). Cursor turns to a pointer on hover.
   const travel = (e: ThreeEvent<MouseEvent>) => {
     e.stopPropagation()
-    if (cameraDrag.moved || useGame.getState().mode !== 'play') return
+    if (pointerSteer.moved || useGame.getState().mode !== 'play') return
     useGame.getState().setAutopilot(landmark.id)
   }
   const hoverOn = (e: ThreeEvent<PointerEvent>) => {

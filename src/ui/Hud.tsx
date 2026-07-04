@@ -9,6 +9,10 @@ import { landmarkById } from '../data/world'
  */
 export function Hud() {
   const mode = useGame((s) => s.mode)
+  const zone = useGame((s) => s.zone)
+  const voidWarp = useGame((s) => s.voidWarp)
+  const voidScore = useGame((s) => s.voidScore)
+  const dropOutOfWarp = useGame((s) => s.dropOutOfWarp)
   const autopilot = useGame((s) => s.autopilot)
   const setAutopilot = useGame((s) => s.setAutopilot)
   const throttle = useShip((s) => s.throttle)
@@ -42,6 +46,15 @@ export function Hud() {
         <span className="dot" />
       </div>
 
+      {/* void warp transit — drop out to enter the asteroid belt */}
+      {zone === 'void' && voidWarp && (
+        <button className="warp-drop-btn" onClick={dropOutOfWarp} title="Drop out of warp (B)">
+          <span className="warp-drop-tag">◈ WARP DRIVE</span>
+          <span className="warp-drop-label">DROP OUT</span>
+          <span className="warp-drop-hint">B</span>
+        </button>
+      )}
+
       {/* gateway run — click (or steer) to take back the stick */}
       {gateway && (
         <button
@@ -73,6 +86,29 @@ export function Hud() {
         </button>
       )}
 
+      {/* throttle / velocity gauge + void score */}
+      <div className="hud-left">
+        <div className="throttle">
+          <div className="meta">
+            <span>THR</span>
+            <span className={boosting ? 'boost on' : 'boost'}>
+              {voidWarp && zone === 'void' ? 'WARP' : boosting ? 'BOOST' : 'CRUISE'}
+            </span>
+          </div>
+          <div className="bar">
+            <i style={{ width: `${Math.round(throttle * 100)}%` }} />
+          </div>
+          <div className="vel">VEL {Math.round(speed)} u/s</div>
+        </div>
+
+        {zone === 'void' && !voidWarp && (
+          <div className="void-score">
+            <span className="tag">◈ SCORE</span>
+            <span className="value">{voidScore.toLocaleString()}</span>
+          </div>
+        )}
+      </div>
+
       {/* dock-lock readout */}
       {target && (
         <div className="target-readout">
@@ -83,18 +119,6 @@ export function Hud() {
           <span className="dist">{Math.round(targetDist)} u</span>
         </div>
       )}
-
-      {/* throttle / velocity gauge */}
-      <div className="throttle">
-        <div className="meta">
-          <span>THR</span>
-          <span className={boosting ? 'boost on' : 'boost'}>{boosting ? 'BOOST' : 'CRUISE'}</span>
-        </div>
-        <div className="bar">
-          <i style={{ width: `${Math.round(throttle * 100)}%` }} />
-        </div>
-        <div className="vel">VEL {Math.round(speed)} u/s</div>
-      </div>
     </div>
   )
 }

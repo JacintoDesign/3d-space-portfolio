@@ -1,4 +1,4 @@
-import { Stars, Sparkles } from '@react-three/drei'
+import { Stars } from '@react-three/drei'
 import { useGame } from '../store/useGame'
 
 /**
@@ -16,17 +16,6 @@ export function Starfield() {
   }
 
   return (
-    <>
-      <Stars radius={340} depth={140} count={6500} factor={4} saturation={0} fade speed={0.4} />
-      <Sparkles
-        count={90}
-        scale={[160, 70, 320]}
-        position={[0, 0, -70]}
-        size={3.5}
-        speed={0.25}
-        opacity={0.5}
-        color="#9fe9ff"
-      />
-    </>
+    <Stars radius={340} depth={140} count={6500} factor={1.2} saturation={0} fade speed={0.4} />
   )
 }

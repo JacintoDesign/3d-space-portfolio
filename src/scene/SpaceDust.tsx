@@ -19,8 +19,8 @@ export function SpaceDust() {
       positions[i * 3 + 1] = (Math.random() - 0.5) * 95
       positions[i * 3 + 2] = 40 - Math.random() * 260
     }
-    // soft round point sprite
-    const s = 64
+    // tiny round point sprite — pinpoints, not billboards
+    const s = 32
     const c = document.createElement('canvas')
     c.width = c.height = s
     const ctx = c.getContext('2d')!
@@ -46,7 +46,7 @@ export function SpaceDust() {
         </bufferGeometry>
         <pointsMaterial
           map={dot}
-          size={0.7}
+          size={0.18}
           sizeAttenuation
           color="#bfe9ff"
           transparent

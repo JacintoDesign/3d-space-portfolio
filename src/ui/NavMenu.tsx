@@ -10,10 +10,20 @@ const PROJECTS = LANDMARKS.filter((l) => l.kind === 'project')
  * flight (flies there + auto-docks) or switch instantly while an overlay is
  * open; About is not a station — it cuts to the warp cinematic.
  */
+function goHome() {
+  useGame.getState().goHome()
+}
+
 function go(id: string) {
-  const g = useGame.getState()
-  if (g.mode === 'about') g.closeAbout()
-  if (g.mode === 'contact') g.closeContact()
+  let g = useGame.getState()
+  if (g.mode === 'about') {
+    g.closeAbout()
+    g = useGame.getState()
+  }
+  if (g.mode === 'contact') {
+    g.closeContact()
+    g = useGame.getState()
+  }
   if (g.mode === 'overlay') {
     if (g.activeBuilding !== id) g.openOverlay(id)
     return
@@ -60,9 +70,12 @@ function DestButton({ id, onPick }: { id: string; onPick: () => void }) {
 export function NavMenu() {
   const [drop, setDrop] = useState(false)
   const mode = useGame((s) => s.mode)
+  const zone = useGame((s) => s.zone)
   const autopilot = useGame((s) => s.autopilot)
   const activeBuilding = useGame((s) => s.activeBuilding)
   const ref = useRef<HTMLElement>(null)
+
+  const atHome = mode === 'play' && zone === 'nebula' && !autopilot && !activeBuilding
 
   useEffect(() => {
     if (!drop) return
@@ -78,6 +91,9 @@ export function NavMenu() {
 
   return (
     <nav className="nav" ref={ref} aria-label="Sections">
+      <button className={cls(atHome)} onClick={() => { setDrop(false); goHome() }}>
+        Home
+      </button>
       <button className={cls(mode === 'about')} onClick={() => { setDrop(false); goAbout() }}>
         About
       </button>
@@ -123,6 +139,17 @@ export function MobileNav() {
             </button>
           </div>
           <div className="nav-sheet-list">
+            <button
+              style={{ '--dot': '#5be9ff' } as CSSProperties}
+              onClick={() => {
+                close()
+                goHome()
+              }}
+            >
+              <span className="nav-dot" />
+              <span className="nav-name">HOME</span>
+              <span className="nav-sub">原点 · SPAWN</span>
+            </button>
             <button
               style={{ '--dot': STUDIO.about.color } as CSSProperties}
               onClick={() => {

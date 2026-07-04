@@ -6,6 +6,15 @@ export type GameMode = 'loading' | 'play' | 'overlay' | 'about' | 'contact'
 
 export type Zone = 'nebula' | 'void'
 
+/** Discrete asteroid tiers in the void belt — fixed radii + score values. */
+export type AsteroidSizeTier = 'small' | 'medium' | 'large'
+
+export const VOID_ASTEROID_SCORES: Record<AsteroidSizeTier, number> = {
+  small: 10,
+  medium: 50,
+  large: 100,
+}
+
 /**
  * Leaving an About/Contact warp cinematic routes the ship home through the
  * gateway to a project. Pick the station nearest the gateway (so the nebula-side
@@ -62,6 +71,8 @@ interface GameState {
   parked: string | null
   /** Which side of the portal the ship is on. 'void' = the dark space beyond. */
   zone: Zone
+  /** In the void: still in portal warp transit — drop out to enter the asteroid belt. */
+  voidWarp: boolean
   /** Increments on every portal transit — drives the UI warp flash. */
   transit: number
   /** Whether the new-user controls tutorial has been dismissed (persisted). */
@@ -74,6 +85,10 @@ interface GameState {
   photoMode: boolean
   /** Ambient audio toggle. */
   muted: boolean
+  /** Asteroids destroyed in the current void belt run. */
+  voidScore: number
+  /** Bumps on goHome — Ship + ChaseCamera snap back to the spawn pose. */
+  homeTick: number
 
   setReady: () => void
   setMobile: (v: boolean) => void
@@ -90,8 +105,13 @@ interface GameState {
   closeContact: () => void
   /** Portal fly-through: swap zones and bump the transit counter (UI flash). */
   doTransit: () => void
+  /** Exit sustained void warp and enter the asteroid belt. */
+  dropOutOfWarp: () => void
   dismissControls: () => void
   toggleMuted: () => void
+  addVoidScore: (points: number) => void
+  /** Reset to the initial nebula spawn view — ship pose, zone, overlays, autopilot. */
+  goHome: () => void
 }
 
 export const useGame = create<GameState>((set, get) => ({
@@ -102,12 +122,15 @@ export const useGame = create<GameState>((set, get) => ({
   autopilot: null,
   parked: null,
   zone: 'nebula',
+  voidWarp: false,
   transit: 0,
   controlsSeen: readControlsSeen(),
   isMobile: false,
   reducedMotion: false,
   photoMode: false,
   muted: true,
+  voidScore: 0,
+  homeTick: 0,
 
   setReady: () => set((s) => (s.mode === 'loading' ? { mode: 'play' } : {})),
   setMobile: (v) => set({ isMobile: v }),
@@ -161,6 +184,7 @@ export const useGame = create<GameState>((set, get) => ({
       parked: null,
       nearTarget: null,
       zone: 'void',
+      voidWarp: false,
       transit: s.zone === 'void' ? s.transit : s.transit + 1,
     }))
   },
@@ -181,6 +205,7 @@ export const useGame = create<GameState>((set, get) => ({
       parked: null,
       nearTarget: null,
       zone: 'void',
+      voidWarp: false,
       transit: s.zone === 'void' ? s.transit : s.transit + 1,
     }))
   },
@@ -193,7 +218,22 @@ export const useGame = create<GameState>((set, get) => ({
   doTransit: () => {
     playConfirm()
     if (get().isMobile) buzz([20, 30, 50])
-    set((s) => ({ zone: s.zone === 'nebula' ? 'void' : 'nebula', transit: s.transit + 1 }))
+    set((s) => {
+      const enteringVoid = s.zone === 'nebula'
+      return {
+        zone: enteringVoid ? 'void' : 'nebula',
+        voidWarp: enteringVoid,
+        transit: s.transit + 1,
+        voidScore: enteringVoid ? 0 : s.voidScore,
+      }
+    })
+  },
+
+  dropOutOfWarp: () => {
+    if (!get().voidWarp || get().zone !== 'void') return
+    playConfirm()
+    if (get().isMobile) buzz(40)
+    set({ voidWarp: false, voidScore: 0 })
   },
 
   dismissControls: () => {
@@ -206,6 +246,25 @@ export const useGame = create<GameState>((set, get) => ({
   },
 
   toggleMuted: () => set((s) => ({ muted: !s.muted })),
+
+  addVoidScore: (points) => set((s) => ({ voidScore: s.voidScore + points })),
+
+  goHome: () => {
+    const s = get()
+    if (s.mode === 'loading') return
+    playConfirm()
+    set({
+      mode: 'play',
+      activeBuilding: null,
+      autopilot: null,
+      parked: null,
+      nearTarget: null,
+      zone: 'nebula',
+      voidWarp: false,
+      voidScore: 0,
+      homeTick: s.homeTick + 1,
+    })
+  },
 }))
 
 /** Convenience selector: is the player free to move? */

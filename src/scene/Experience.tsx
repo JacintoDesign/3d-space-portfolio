@@ -9,6 +9,7 @@ import { Starfield } from './Starfield'
 import { SpaceDust } from './SpaceDust'
 import { Moon } from './Moon'
 import { Sector } from './Sector'
+import { VoidCombat } from './VoidCombat'
 import { Effects } from './effects/Effects'
 import { Ship } from '../ship/Ship'
 import { ChaseCamera } from '../ship/ChaseCamera'
@@ -53,6 +54,7 @@ export function Experience() {
           <SpaceDust />
           <Sector />
           <Ship groupRef={ship} />
+          <VoidCombat shipRef={ship} />
           <Preload all />
         </Suspense>
 

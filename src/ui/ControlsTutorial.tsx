@@ -38,6 +38,12 @@ export function ControlsTutorial({ onClose }: { onClose: () => void }) {
                 <b>Tap a station</b> or the nav — autopilot flies you there
               </span>
             </div>
+            <div className="control">
+              <span className="kbd">◈</span>
+              <span className="desc">
+                Punch through the <b>gateway</b> to warp — tap <b>DROP OUT</b> for the asteroid belt
+              </span>
+            </div>
           </div>
         ) : (
           <div className="controls-grid">
@@ -66,7 +72,31 @@ export function ControlsTutorial({ onClose }: { onClose: () => void }) {
                 <span className="kbd">Mouse</span>
               </span>
               <span className="desc">
-                <b>Drag</b> to orbit the camera · <b>click a station</b> to fly there
+                Move or <b>drag</b> to steer — the ship <b>banks</b> into turns · <b>click a station</b> to fly there
+              </span>
+            </div>
+            <div className="control">
+              <span className="keys">
+                <span className="kbd">Portal</span>
+              </span>
+              <span className="desc">
+                Fly through the <b>gateway</b> to warp into the void — then <b>drop out</b> to enter the asteroid belt
+              </span>
+            </div>
+            <div className="control">
+              <span className="keys">
+                <span className="kbd">B</span>
+              </span>
+              <span className="desc">
+                <b>Drop out of warp</b> in the void to slow down and enter the belt
+              </span>
+            </div>
+            <div className="control">
+              <span className="keys">
+                <span className="kbd">Space</span>
+              </span>
+              <span className="desc">
+                After drop-out, <b>fire lasers</b> at drifting asteroids
               </span>
             </div>
             <div className="control">

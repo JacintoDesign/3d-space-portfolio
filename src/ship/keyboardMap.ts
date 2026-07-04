@@ -9,6 +9,7 @@ export type Controls =
   | 'pitchUp'
   | 'pitchDown'
   | 'boost'
+  | 'fire'
 
 export const keyboardMap: KeyboardControlsEntry<Controls>[] = [
   { name: 'accelerate', keys: ['KeyW'] },
@@ -18,4 +19,5 @@ export const keyboardMap: KeyboardControlsEntry<Controls>[] = [
   { name: 'pitchUp', keys: ['ArrowUp'] },
   { name: 'pitchDown', keys: ['ArrowDown'] },
   { name: 'boost', keys: ['ShiftLeft', 'ShiftRight'] },
+  { name: 'fire', keys: ['Space'] },
 ]

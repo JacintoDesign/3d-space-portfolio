@@ -1,9 +1,10 @@
 import { useEffect, useRef, type RefObject } from 'react'
-import { useFrame } from '@react-three/fiber'
+import { useFrame, useThree } from '@react-three/fiber'
 import { useKeyboardControls } from '@react-three/drei'
 import * as THREE from 'three'
 import { ShipModel, type ShipMotion } from './ShipModel'
 import type { Controls } from './keyboardMap'
+import { pointerSteer } from './pointerSteer'
 import { useGame } from '../store/useGame'
 import { useInput } from '../store/useInput'
 import { useShip } from '../store/useShip'
@@ -14,9 +15,11 @@ const CRUISE = 16
 const BOOST = 32
 const STOP = 0.4
 const ACCEL_LERP = 2.4
-// No idle thrust: the ship coasts to a stop unless you hold thrust (W / mobile
-// THRUST). Hold to cruise, Shift / BOOST to boost. The void is a fast corridor
-// when you do thrust through it.
+const DECEL_LERP = 14 // snap to rest when thrust is released — no idle drift
+const STOP_EPS = 0.06
+// No idle thrust: the ship stops unless you hold thrust (W / mobile THRUST).
+// Hold to cruise, Shift / BOOST to boost. The void is a fast corridor when you
+// do thrust through it.
 const VOID_CRUISE = 26
 // About/Contact cinematic: the ship only drifts gently (so the orbit camera can
 // hold a rock-steady frame + the auto-return home is short) while warp streaks
@@ -39,6 +42,13 @@ const AP_PITCH_GAIN = 2.6
 const AP_ARRIVE = 0.6
 // Manual-input thresholds that hand the stick back from the autopilot.
 const AP_CANCEL_STEER = 0.45
+
+const MOUSE_STEER_SENS = 0.0048 // rad per px dragged
+const DRAG_THRESHOLD = 6 // px before a press is a steer drag, not a station click
+const CURSOR_YAW_RATE = 1.05 // rad/s at full horizontal deflection
+const CURSOR_PITCH_RATE = 0.72
+const CURSOR_DEAD = 0.07
+const DRAG_BANK_SCALE = 36 // mouse-yaw delta → bank intent
 
 /** Sentinel autopilot id: fly to (and through) the gateway portal. */
 export const AP_GATEWAY = 'gateway'
@@ -83,6 +93,7 @@ const WORLD_UP = new THREE.Vector3(0, 1, 0)
 export function Ship({ groupRef }: { groupRef: RefObject<THREE.Group | null> }) {
   const motion = useRef<ShipMotion>({ speed: 0, throttle: 0, boost: false, bank: 0 })
   const [, getKeys] = useKeyboardControls<Controls>()
+  const gl = useThree((s) => s.gl)
 
   const speed = useRef(0)
   const telAcc = useRef(0)
@@ -94,6 +105,85 @@ export function Ship({ groupRef }: { groupRef: RefObject<THREE.Group | null> }) 
   const prevPortalDz = useRef<number | null>(null) // signed distance to the portal plane last frame
   const wasCinematic = useRef(false) // was in an About/Contact warp cinematic last frame
   const apRouted = useRef<string | null>(null) // station id we've express-teleported to the gate for
+  const expressPending = useRef(false) // force gate express after leaving a warp cinematic
+  const prevZone = useRef<'nebula' | 'void'>('nebula')
+  const homeTick = useRef(0)
+
+  const resetToSpawn = (group: THREE.Group) => {
+    group.position.set(...WORLD.spawn)
+    group.quaternion.identity()
+    speed.current = 0
+    hover.current = false
+    parkedLm.current = null
+    warpUntil.current = 0
+    prevPortalDz.current = null
+    apRouted.current = null
+    expressPending.current = false
+    dockLatch.current = null
+    pointerSteer.moved = false
+    pointerSteer.yaw = 0
+    pointerSteer.pitch = 0
+    pointerSteer.cursorX = 0
+    pointerSteer.cursorY = 0
+    useInput.getState().reset()
+  }
+
+  // Desktop: drag on the canvas to steer (yaw + pitch); track cursor vs screen
+  // centre for banking + gentle aim. A press that never moves past the threshold
+  // stays a click (station travel); a drag suppresses that click.
+  useEffect(() => {
+    const el = gl.domElement
+    let active = false
+    let downX = 0
+    let downY = 0
+    let lastX = 0
+    let lastY = 0
+    let dragging = false
+    const trackCursor = (e: MouseEvent) => {
+      if (useGame.getState().mode !== 'play' || useGame.getState().isMobile) return
+      const hw = window.innerWidth * 0.5
+      const hh = window.innerHeight * 0.5
+      pointerSteer.cursorX = THREE.MathUtils.clamp((e.clientX - hw) / hw, -1, 1)
+      pointerSteer.cursorY = THREE.MathUtils.clamp((e.clientY - hh) / hh, -1, 1)
+    }
+    const onDown = (e: PointerEvent) => {
+      if (e.button !== 0 || useGame.getState().mode !== 'play' || useGame.getState().isMobile) return
+      active = true
+      dragging = false
+      pointerSteer.moved = false
+      downX = lastX = e.clientX
+      downY = lastY = e.clientY
+      trackCursor(e)
+    }
+    const onMove = (e: PointerEvent) => {
+      trackCursor(e)
+      if (!active) return
+      const dx = e.clientX - lastX
+      const dy = e.clientY - lastY
+      lastX = e.clientX
+      lastY = e.clientY
+      if (!dragging && Math.hypot(e.clientX - downX, e.clientY - downY) > DRAG_THRESHOLD) {
+        dragging = true
+        pointerSteer.moved = true
+      }
+      if (dragging) {
+        pointerSteer.yaw += dx * MOUSE_STEER_SENS
+        pointerSteer.pitch += dy * MOUSE_STEER_SENS
+      }
+    }
+    const onUp = () => {
+      active = false
+      dragging = false
+    }
+    el.addEventListener('pointerdown', onDown)
+    window.addEventListener('pointermove', onMove)
+    window.addEventListener('pointerup', onUp)
+    return () => {
+      el.removeEventListener('pointerdown', onDown)
+      window.removeEventListener('pointermove', onMove)
+      window.removeEventListener('pointerup', onUp)
+    }
+  }, [gl])
 
   useFrame((_, dRaw) => {
     const group = groupRef.current
@@ -102,12 +192,31 @@ export function Ship({ groupRef }: { groupRef: RefObject<THREE.Group | null> }) 
     time.current += delta
     const game = useGame.getState()
     const playing = game.mode === 'play'
+
+    if (game.homeTick !== homeTick.current) {
+      homeTick.current = game.homeTick
+      resetToSpawn(group)
+    }
+
     const cinematic = game.mode === 'about' || game.mode === 'contact' // warp-speed overlay views
     const flying = playing || cinematic
     const inNebula = game.zone === 'nebula'
+    const inVoidWarp = !inNebula && playing && game.voidWarp
     const mobile = game.isMobile
     const input = useInput.getState()
     const keys = getKeys()
+
+    // Kill void warp the instant we re-enter the nebula — no lingering streaks.
+    if (inNebula && prevZone.current === 'void') {
+      warpUntil.current = 0
+    }
+    prevZone.current = game.zone
+
+    // Leaving a warp cinematic with a station autopilot: always re-express to the gate.
+    if (!cinematic && wasCinematic.current && playing && game.autopilot) {
+      expressPending.current = true
+      apRouted.current = null
+    }
 
     // Hover only lives while flying free; leaving play (overlay/cinematic) drops it.
     if (!playing) hover.current = false
@@ -118,14 +227,23 @@ export function Ship({ groupRef }: { groupRef: RefObject<THREE.Group | null> }) 
     if (cinematic && !wasCinematic.current) {
       group.position.copy(VOID_ANCHOR)
       group.quaternion.identity() // faces -Z, deeper into the void
+      speed.current = CINE_SPEED // warp streaks read boost, not throttle — drift at cinematic pace
+      warpUntil.current = 0
       prevPortalDz.current = null
       hover.current = false
     }
     wasCinematic.current = cinematic
 
-    // --- gather manual steering intent. Desktop steers with the keyboard only
-    //     (the mouse is for the camera + clicking stations); mobile uses the
-    //     on-screen d-pad. ---
+    // --- gather manual steering intent. Desktop steers with keyboard + mouse
+    //     drag; mobile uses the on-screen d-pad. ---
+    const mouseYaw = pointerSteer.yaw
+    const mousePitch = pointerSteer.pitch
+    const cursorX = pointerSteer.cursorX
+    const cursorY = pointerSteer.cursorY
+    pointerSteer.yaw = 0
+    pointerSteer.pitch = 0
+
+    let bankIntent = 0
     let sx = 0
     let sy = 0
     if (playing) {
@@ -145,6 +263,7 @@ export function Ship({ groupRef }: { groupRef: RefObject<THREE.Group | null> }) 
     }
     sx = THREE.MathUtils.clamp(sx, -1, 1)
     sy = THREE.MathUtils.clamp(sy, -1, 1)
+    if (cinematic) bankIntent = sx
 
     // --- hover: parked in front of a station by the autopilot. Any throttle
     //     key / mobile button hands back the engines. ---
@@ -165,6 +284,8 @@ export function Ship({ groupRef }: { groupRef: RefObject<THREE.Group | null> }) 
       const wantsManual =
         Math.abs(sx) > AP_CANCEL_STEER ||
         Math.abs(sy) > AP_CANCEL_STEER ||
+        mouseYaw !== 0 ||
+        mousePitch !== 0 ||
         keys.accelerate ||
         keys.brake ||
         keys.boost ||
@@ -204,7 +325,13 @@ export function Ship({ groupRef }: { groupRef: RefObject<THREE.Group | null> }) 
     //     punch-through, not a long haul across empty void (user: "teleport
     //     close to the gate, then go through to the project quickly"). ---
     if (apRouted.current && apRouted.current !== apId) apRouted.current = null
-    if (playing && apId && apId !== AP_GATEWAY && !inNebula && apRouted.current !== apId) {
+    if (
+      playing &&
+      apId &&
+      apId !== AP_GATEWAY &&
+      !inNebula &&
+      (apRouted.current !== apId || expressPending.current)
+    ) {
       const lm = landmarkById(apId)
       if (lm) {
         const gw = WORLD.gateway.position
@@ -224,6 +351,7 @@ export function Ship({ groupRef }: { groupRef: RefObject<THREE.Group | null> }) 
         prevPortalDz.current = null
         hover.current = false
         apRouted.current = apId
+        expressPending.current = false
       }
     }
 
@@ -315,27 +443,60 @@ export function Ship({ groupRef }: { groupRef: RefObject<THREE.Group | null> }) 
     }
 
     // --- throttle: no thrust unless applied. Hold W / mobile THRUST to cruise,
-    //     Shift / BOOST to boost, S / BRAKE to stop; release and the ship coasts
-    //     to rest. The void cruises faster (warp corridor) when you do thrust. ---
+    //     Shift / BOOST to boost, S / BRAKE to stop; release thrust and the ship
+    //     decelerates to zero — no idle drift. ---
     const boostK = playing && (keys.boost || input.boost)
     const braking = playing && (keys.brake || input.brake)
     const wantThrust = playing && (keys.accelerate || input.thrust)
     let targetSpeed: number
     if (cinematic) targetSpeed = CINE_SPEED
     else if (!playing) targetSpeed = 0
-    else if (time.current < warpUntil.current) targetSpeed = BOOST // portal warp burst
+    else if (inVoidWarp) targetSpeed = BOOST // sustained portal warp until drop-out
+    else if (time.current < warpUntil.current) targetSpeed = BOOST // express gate punch-through
     else if (hover.current) targetSpeed = 0
     else if (apSpeed !== null) targetSpeed = apSpeed
     else if (braking) targetSpeed = STOP
     else if (boostK) targetSpeed = BOOST
     else if (!wantThrust) targetSpeed = 0
     else targetSpeed = inNebula ? CRUISE : VOID_CRUISE
-    speed.current += (targetSpeed - speed.current) * Math.min(1, delta * ACCEL_LERP)
+    const freeFlight =
+      playing &&
+      !cinematic &&
+      !inVoidWarp &&
+      apSpeed === null &&
+      !hover.current &&
+      time.current >= warpUntil.current
+    const lerpRate = freeFlight && targetSpeed === 0 ? DECEL_LERP : ACCEL_LERP
+    speed.current += (targetSpeed - speed.current) * Math.min(1, delta * lerpRate)
+    if (freeFlight && targetSpeed === 0 && speed.current < STOP_EPS) speed.current = 0
 
-    // --- orientation: yaw about WORLD up (stable horizon), pitch about local right ---
+    // --- orientation: mouse drag, cursor aim, then keyboard yaw/pitch ---
+    if (playing && !mobile) {
+      if (mouseYaw !== 0) {
+        qTmp.setFromAxisAngle(WORLD_UP, -mouseYaw)
+        group.quaternion.premultiply(qTmp)
+        bankIntent = THREE.MathUtils.clamp(bankIntent + mouseYaw * DRAG_BANK_SCALE, -1, 1)
+      }
+      if (mousePitch !== 0) {
+        right.set(1, 0, 0).applyQuaternion(group.quaternion).normalize()
+        qTmp.setFromAxisAngle(right, -mousePitch)
+        group.quaternion.premultiply(qTmp)
+      }
+      if (Math.abs(cursorX) > CURSOR_DEAD) {
+        qTmp.setFromAxisAngle(WORLD_UP, -cursorX * CURSOR_YAW_RATE * delta)
+        group.quaternion.premultiply(qTmp)
+        bankIntent = THREE.MathUtils.clamp(bankIntent + cursorX, -1, 1)
+      }
+      if (Math.abs(cursorY) > CURSOR_DEAD) {
+        right.set(1, 0, 0).applyQuaternion(group.quaternion).normalize()
+        qTmp.setFromAxisAngle(right, -cursorY * CURSOR_PITCH_RATE * delta)
+        group.quaternion.premultiply(qTmp)
+      }
+    }
     if (sx !== 0) {
       qTmp.setFromAxisAngle(WORLD_UP, -sx * YAW_RATE * delta)
       group.quaternion.premultiply(qTmp)
+      bankIntent = THREE.MathUtils.clamp(bankIntent + sx, -1, 1)
     }
     right.set(1, 0, 0).applyQuaternion(group.quaternion).normalize()
     if (sy !== 0) {
@@ -345,7 +506,7 @@ export function Ship({ groupRef }: { groupRef: RefObject<THREE.Group | null> }) 
     // Auto-level pitch back toward the horizon when no pitch input (arcade feel).
     // Suppressed while hover-parked so the nose can hold on an off-level station.
     forward.set(0, 0, -1).applyQuaternion(group.quaternion)
-    if (!hover.current && Math.abs(sy) < 0.05 && Math.abs(forward.y) > 0.001) {
+    if (!hover.current && Math.abs(sy) < 0.05 && mousePitch === 0 && Math.abs(cursorY) < CURSOR_DEAD && Math.abs(forward.y) > 0.001) {
       qTmp.setFromAxisAngle(right, forward.y * AUTO_LEVEL * delta)
       group.quaternion.premultiply(qTmp)
     }
@@ -366,7 +527,7 @@ export function Ship({ groupRef }: { groupRef: RefObject<THREE.Group | null> }) 
       if (prev !== null && (dzPortal > 0) !== (prev > 0)) {
         const lat = Math.hypot(group.position.x - gw[0], group.position.y - gw[1])
         if (lat < WORLD.gateway.radius * PORTAL_OPENING) {
-          warpUntil.current = time.current + TRANSIT_WARP_S
+          warpUntil.current = inNebula ? 0 : time.current + TRANSIT_WARP_S
           hover.current = false
           // Keep a station-bound autopilot alive so it carries on to its target
           // on the far side; only a gateway-targeted run ends at the membrane.
@@ -465,9 +626,10 @@ export function Ship({ groupRef }: { groupRef: RefObject<THREE.Group | null> }) 
     const norm = THREE.MathUtils.clamp(speed.current / BOOST, 0, 1)
     motion.current.speed = speed.current
     motion.current.throttle = norm
-    // Cinematic forces the streaks on even though the ship only drifts gently.
-    motion.current.boost = cinematic || speed.current > CRUISE * 1.05
-    motion.current.bank = -sx * MAX_BANK
+    // Cinematic forces streaks on even though the ship only drifts gently.
+    motion.current.boost =
+      cinematic || inVoidWarp || (time.current < warpUntil.current && !inNebula) || speed.current > CRUISE * 1.05
+    motion.current.bank = cinematic ? -sx * MAX_BANK : -bankIntent * MAX_BANK
 
     telAcc.current += delta
     if (telAcc.current >= TELEMETRY_DT) {
@@ -490,7 +652,7 @@ export function Ship({ groupRef }: { groupRef: RefObject<THREE.Group | null> }) 
   // Spawn pose: identity rotation already faces -Z (into the corridor).
   useEffect(() => {
     const g = groupRef.current
-    if (g) g.position.set(...WORLD.spawn)
+    if (g) resetToSpawn(g)
     if (import.meta.env.DEV && g) {
       ;(window as unknown as { __shipObj: THREE.Group }).__shipObj = g
     }

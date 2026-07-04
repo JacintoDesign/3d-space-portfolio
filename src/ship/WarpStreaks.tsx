@@ -33,6 +33,7 @@ export function WarpStreaks({ motion }: { motion: RefObject<ShipMotion> }) {
     if (mesh.current) mesh.current.visible = vis > 0.02
     if (!mesh.current || vis <= 0.02) return
 
+    mesh.current.count = N
     for (let i = 0; i < N; i++) {
       const s = seeds[i]
       s.z += (28 * vis + 6) * s.speed * delta // stream backward past the camera

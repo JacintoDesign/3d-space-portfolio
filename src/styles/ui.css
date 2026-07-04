@@ -511,8 +511,8 @@
 }
 .controls-grid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 14px;
+  grid-template-columns: 1fr;
+  gap: 12px;
   text-align: left;
   margin-bottom: 26px;
 }
@@ -731,10 +731,46 @@
   color: var(--text-dim);
 }
 
-.throttle {
+.hud-left {
   position: absolute;
   left: clamp(16px, 3vw, 30px);
   bottom: clamp(16px, 4vh, 34px);
+  display: flex;
+  align-items: flex-end;
+  gap: clamp(12px, 2vw, 18px);
+  pointer-events: none;
+}
+
+.void-score {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 102, 34, 0.45);
+  background: rgba(8, 10, 22, 0.72);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 0 18px -6px rgba(255, 102, 34, 0.55);
+  animation: fade 0.3s ease;
+}
+.void-score .tag {
+  font-size: 10px;
+  letter-spacing: 0.28em;
+  color: #ff8844;
+  text-transform: uppercase;
+}
+.void-score .value {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: clamp(22px, 3vw, 28px);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  color: #fff;
+  text-shadow: 0 0 12px rgba(255, 102, 34, 0.85);
+  font-variant-numeric: tabular-nums;
+}
+
+.throttle {
+  position: static;
   width: clamp(150px, 18vw, 210px);
 }
 .throttle .meta {
@@ -832,12 +868,22 @@
   }
   /* On phones the bottom corners belong to the touch controls — move the HUD
      gauges up top so nothing overlaps the joystick / BOOST / BRAKE. */
-  .throttle {
+  .hud-left {
     left: 50%;
     transform: translateX(-50%);
     bottom: auto;
     top: 76px;
-    width: min(62vw, 260px);
+    flex-wrap: nowrap;
+    justify-content: center;
+  }
+  .hud-left .throttle {
+    width: min(52vw, 220px);
+  }
+  .void-score {
+    padding: 8px 12px;
+  }
+  .void-score .value {
+    font-size: 20px;
   }
   .radar {
     top: 72px;
@@ -1267,6 +1313,52 @@
 }
 .ap-chip:hover .ap-cancel {
   color: var(--neon-pink);
+}
+
+.warp-drop-btn {
+  position: absolute;
+  bottom: clamp(88px, 14vh, 128px);
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 22px;
+  border-radius: 999px;
+  border: 1px solid #9fe9ff;
+  background: rgba(8, 10, 22, 0.82);
+  backdrop-filter: blur(12px);
+  box-shadow: 0 0 28px -4px rgba(95, 233, 255, 0.55);
+  color: var(--text);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  letter-spacing: 0.18em;
+  white-space: nowrap;
+  cursor: pointer;
+  animation: warpDropPulse 2s ease-in-out infinite;
+}
+.warp-drop-btn:hover {
+  border-color: var(--neon-cyan);
+  box-shadow: 0 0 36px -2px rgba(95, 233, 255, 0.75);
+}
+.warp-drop-btn .warp-drop-tag {
+  color: #9fe9ff;
+}
+.warp-drop-btn .warp-drop-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #fff;
+}
+.warp-drop-btn .warp-drop-hint {
+  padding: 2px 7px;
+  border-radius: 4px;
+  border: 1px solid rgba(159, 233, 255, 0.35);
+  color: var(--text-dim);
+  font-size: 10px;
+}
+@keyframes warpDropPulse {
+  0%, 100% { box-shadow: 0 0 28px -4px rgba(95, 233, 255, 0.45); }
+  50% { box-shadow: 0 0 40px 0 rgba(95, 233, 255, 0.7); }
 }
 
 /* ====================== Reduced-motion accessibility ================== */
