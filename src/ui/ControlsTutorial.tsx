@@ -1,0 +1,97 @@
+import { useGame } from '../store/useGame'
+
+export function ControlsTutorial({ onClose }: { onClose: () => void }) {
+  const isMobile = useGame((s) => s.isMobile)
+
+  return (
+    <div className="tutorial">
+      <div className="card">
+        <h3>Welcome to the Drift</h3>
+        <p className="lead">
+          You&apos;re adrift in a neon nebula. Pilot your ship to the floating stations and dock to explore the work
+          of Jacinto Design.
+        </p>
+
+        {isMobile ? (
+          <div className="controls-grid">
+            <div className="control">
+              <span className="kbd">✛</span>
+              <span className="desc">
+                <b>D-pad</b> to steer — yaw &amp; pitch
+              </span>
+            </div>
+            <div className="control">
+              <span className="kbd">THRUST</span>
+              <span className="desc">
+                Hold <b>THRUST</b> to fly · <b>BOOST</b> for warp
+              </span>
+            </div>
+            <div className="control">
+              <span className="kbd">◎</span>
+              <span className="desc">
+                Fly at a station to <b>dock</b> automatically
+              </span>
+            </div>
+            <div className="control">
+              <span className="kbd">☰</span>
+              <span className="desc">
+                <b>Tap a station</b> or the nav — autopilot flies you there
+              </span>
+            </div>
+          </div>
+        ) : (
+          <div className="controls-grid">
+            <div className="control">
+              <span className="keys">
+                <span className="kbd">W</span>
+                <span className="kbd">Shift</span>
+              </span>
+              <span className="desc">
+                <b>Thrust</b> to fly (no idle drift) · hold Shift to <b>boost</b>
+              </span>
+            </div>
+            <div className="control">
+              <span className="keys">
+                <span className="kbd">A</span>
+                <span className="kbd">D</span>
+                <span className="kbd">↑</span>
+                <span className="kbd">↓</span>
+              </span>
+              <span className="desc">
+                <b>Turn</b> — A/D yaw, arrows pitch · <b>S</b> brakes
+              </span>
+            </div>
+            <div className="control">
+              <span className="keys">
+                <span className="kbd">Mouse</span>
+              </span>
+              <span className="desc">
+                <b>Drag</b> to orbit the camera · <b>click a station</b> to fly there
+              </span>
+            </div>
+            <div className="control">
+              <span className="keys">
+                <span className="kbd">◎</span>
+              </span>
+              <span className="desc">
+                <b>Dock</b> by flying at a station — it locks on automatically
+              </span>
+            </div>
+            <div className="control">
+              <span className="keys">
+                <span className="kbd">➤</span>
+              </span>
+              <span className="desc">
+                <b>Autopilot</b> — the top menu or any edge arrow flies you there; the sector edge flies you home
+              </span>
+            </div>
+          </div>
+        )}
+
+        <button className="btn" onClick={onClose} style={{ width: '100%', justifyContent: 'center' }}>
+          Engage
+        </button>
+      </div>
+    </div>
+  )
+}

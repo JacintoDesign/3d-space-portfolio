@@ -1,0 +1,86 @@
+import { PROJECTS } from './projects'
+
+export type LandmarkKind = 'project'
+
+export interface Landmark {
+  id: string
+  kind: LandmarkKind
+  /** Reference id into PROJECTS when kind === 'project'. */
+  refId?: string
+  /** Latin neon sign (used by HUD + 3D signage). */
+  sign: string
+  /** Japanese blade-sign glyphs. */
+  signJP: string
+  /** Station-class sub-label, e.g. "市場 · ARCADE BAY". */
+  sub: string
+  color: string
+  /** World position of the station core. */
+  position: [number, number, number]
+  /** Station core radius — drives mesh scale and the dock trigger range. */
+  radius: number
+  /** Deterministic variety seed for procedural detailing. */
+  seed: number
+}
+
+const p = (id: string) => {
+  const proj = PROJECTS.find((x) => x.id === id)
+  if (!proj) throw new Error(`world: unknown project ${id}`)
+  return proj
+}
+
+function projectStation(
+  id: string,
+  position: [number, number, number],
+  radius: number,
+  seed: number,
+): Landmark {
+  const proj = p(id)
+  return {
+    id: proj.id,
+    kind: 'project',
+    refId: proj.id,
+    sign: proj.sign,
+    signJP: proj.signJP,
+    sub: proj.sub,
+    color: proj.color,
+    position,
+    radius,
+    seed,
+  }
+}
+
+/**
+ * Flight corridor. The six project stations stagger left/right at varied depth +
+ * height down a curving lane through the nebula; the COMMS relay (Contact)
+ * anchors the far end. A derelict gateway-ring (see Sector) looms behind the
+ * lane as the hero landmark. (About is not a station — it's the warp cinematic.)
+ */
+export const LANDMARKS: Landmark[] = [
+  projectStation('scoundrel', [-22, -2, -22], 5, 23),
+  projectStation('music-player', [24, 8, -46], 5, 37),
+  projectStation('recipes', [-26, 2, -72], 5, 41),
+  projectStation('podcast', [22, -8, -96], 5, 53),
+  projectStation('quotes', [-24, 6, -120], 5, 67),
+  projectStation('reaction', [26, -2, -146], 5, 71),
+]
+
+export const landmarkById = (id: string) => LANDMARKS.find((l) => l.id === id)
+
+/** Spawn pose, soft play-volume, and dock trigger distance for the arcade flight model. */
+export const WORLD = {
+  /** Ship spawn position + the point it initially faces. */
+  spawn: [0, 2, 28] as [number, number, number],
+  lookAt: [0, 1, 0] as [number, number, number],
+  /** Soft spherical boundary: outside this, the ship is gently eased back in. */
+  bounds: {
+    center: [0, 0, -78] as [number, number, number],
+    radius: 155,
+  },
+  /** Within this distance of a station core, docking becomes available. */
+  dockRange: 17,
+  /** The hero gateway-ring that frames the far end of the lane. */
+  gateway: {
+    position: [0, 2, -150] as [number, number, number],
+    radius: 46,
+  },
+}
