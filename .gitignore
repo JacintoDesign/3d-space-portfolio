@@ -37,3 +37,4 @@ yarn-error.log*
 
 # claude code local (personal machine settings)
 .claude/settings.local.json
+.vercel
