@@ -17,7 +17,7 @@ export function ControlsTutorial({ onClose }: { onClose: () => void }) {
             <div className="control">
               <span className="kbd">✛</span>
               <span className="desc">
-                <b>D-pad</b> to steer — yaw &amp; pitch
+                <b>Hold</b> on screen to steer — further from centre = sharper turn
               </span>
             </div>
             <div className="control">
@@ -42,6 +42,12 @@ export function ControlsTutorial({ onClose }: { onClose: () => void }) {
               <span className="kbd">◈</span>
               <span className="desc">
                 Punch through the <b>gateway</b> to warp — tap <b>DROP OUT</b> for the asteroid belt
+              </span>
+            </div>
+            <div className="control">
+              <span className="kbd">SHOOT</span>
+              <span className="desc">
+                In the belt, tap <b>SHOOT</b> to fire lasers at asteroids
               </span>
             </div>
           </div>

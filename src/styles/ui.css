@@ -554,67 +554,6 @@
   pointer-events: none;
   z-index: 20;
 }
-/* Semi-transparent d-pad — steers yaw (◀▶) + pitch (▲▼). */
-.dpad {
-  position: absolute;
-  left: clamp(14px, 5vw, 44px);
-  bottom: clamp(24px, 8vh, 64px);
-  display: grid;
-  grid-template-columns: repeat(3, 46px);
-  grid-template-rows: repeat(3, 46px);
-  pointer-events: none;
-  touch-action: none;
-}
-.dpad-hub {
-  grid-column: 2;
-  grid-row: 2;
-  border-radius: 50%;
-  margin: 12px;
-  background: rgba(90, 233, 255, 0.12);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-}
-.dpad-btn {
-  width: 46px;
-  height: 46px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  background: rgba(10, 12, 26, 0.32);
-  backdrop-filter: blur(4px);
-  color: rgba(230, 240, 255, 0.85);
-  font-size: 15px;
-  line-height: 1;
-  pointer-events: auto;
-  touch-action: none;
-  -webkit-user-select: none;
-  user-select: none;
-}
-.dpad-btn.up {
-  grid-column: 2;
-  grid-row: 1;
-  border-radius: 10px 10px 4px 4px;
-}
-.dpad-btn.left {
-  grid-column: 1;
-  grid-row: 2;
-  border-radius: 10px 4px 4px 10px;
-}
-.dpad-btn.right {
-  grid-column: 3;
-  grid-row: 2;
-  border-radius: 4px 10px 10px 4px;
-}
-.dpad-btn.down {
-  grid-column: 2;
-  grid-row: 3;
-  border-radius: 4px 4px 10px 10px;
-}
-.dpad-btn.on {
-  background: rgba(5, 217, 232, 0.22);
-  border-color: var(--neon-cyan);
-  color: #fff;
-}
 .touch-actions {
   position: absolute;
   right: clamp(14px, 5vw, 44px);
@@ -643,10 +582,20 @@
 .touch-btn.thrust {
   border-color: rgba(5, 217, 232, 0.5);
 }
+.touch-btn.shoot {
+  border-color: rgba(255, 102, 34, 0.55);
+  font-size: 11px;
+}
 .touch-btn:active,
 .touch-btn.on {
   border-color: var(--neon-pink);
   color: var(--neon-pink);
+}
+.touch-btn.shoot:active,
+.touch-btn.shoot.on {
+  border-color: #ff6622;
+  color: #ff8844;
+  box-shadow: 0 0 16px -4px rgba(255, 102, 34, 0.65);
 }
 
 /* Sci-fi display face for the brand + key HUD numerals */
@@ -866,18 +815,17 @@
   .controls-grid {
     grid-template-columns: 1fr;
   }
-  /* On phones the bottom corners belong to the touch controls — move the HUD
-     gauges up top so nothing overlaps the joystick / BOOST / BRAKE. */
+  /* Mobile HUD: throttle bottom-left; radar beside the touch buttons on the right. */
   .hud-left {
-    left: 50%;
-    transform: translateX(-50%);
-    bottom: auto;
-    top: 76px;
+    left: clamp(12px, 4vw, 18px);
+    bottom: clamp(16px, 4vh, 28px);
+    top: auto;
+    transform: none;
     flex-wrap: nowrap;
-    justify-content: center;
+    justify-content: flex-start;
   }
   .hud-left .throttle {
-    width: min(52vw, 220px);
+    width: min(46vw, 200px);
   }
   .void-score {
     padding: 8px 12px;
@@ -886,20 +834,24 @@
     font-size: 20px;
   }
   .radar {
-    top: 72px;
-    right: clamp(12px, 4vw, 18px);
-    bottom: auto;
-    width: 84px;
+    top: auto;
+    right: calc(clamp(14px, 5vw, 44px) + 82px + 14px);
+    bottom: clamp(16px, 4vh, 28px);
+    width: 82px;
+  }
+  .radar svg {
+    display: block;
   }
   .radar-label {
     display: none;
   }
-  /* Keep the autopilot banner clear of the relocated throttle gauge. */
-  .ap-chip {
-    top: 150px;
-    font-size: 10px;
-    gap: 8px;
-    padding: 8px 13px;
+  .touch-actions {
+    bottom: clamp(16px, 4vh, 28px);
+  }
+  /* Loader: drop desktop-only copy on phones. */
+  .loader .sub,
+  .loader-hint {
+    display: none;
   }
 }
 

@@ -56,12 +56,12 @@ function projectStation(
  * lane as the hero landmark. (About is not a station — it's the warp cinematic.)
  */
 export const LANDMARKS: Landmark[] = [
-  projectStation('scoundrel', [-22, -2, -22], 5, 23),
-  projectStation('music-player', [24, 8, -46], 5, 37),
-  projectStation('recipes', [-26, 2, -72], 5, 41),
-  projectStation('podcast', [22, -8, -96], 5, 53),
-  projectStation('quotes', [-24, 6, -120], 5, 67),
-  projectStation('reaction', [26, -2, -146], 5, 71),
+  projectStation('scoundrel', [-26, -2, -11], 5, 23),
+  projectStation('music-player', [29, 10, -40], 5, 37),
+  projectStation('recipes', [-31, 2, -71], 5, 41),
+  projectStation('podcast', [26, -10, -100], 5, 53),
+  projectStation('quotes', [-29, 7, -128], 5, 67),
+  projectStation('reaction', [31, -2, -160], 5, 71),
 ]
 
 export const landmarkById = (id: string) => LANDMARKS.find((l) => l.id === id)
@@ -69,18 +69,18 @@ export const landmarkById = (id: string) => LANDMARKS.find((l) => l.id === id)
 /** Spawn pose, soft play-volume, and dock trigger distance for the arcade flight model. */
 export const WORLD = {
   /** Ship spawn position + the point it initially faces. */
-  spawn: [0, 2, 28] as [number, number, number],
-  lookAt: [0, 1, 0] as [number, number, number],
+  spawn: [0, 2, 49] as [number, number, number],
+  lookAt: [0, 1, 16] as [number, number, number],
   /** Soft spherical boundary: outside this, the ship is gently eased back in. */
   bounds: {
     center: [0, 0, -78] as [number, number, number],
-    radius: 155,
+    radius: 186,
   },
   /** Within this distance of a station core, docking becomes available. */
   dockRange: 17,
   /** The hero gateway-ring that frames the far end of the lane. */
   gateway: {
-    position: [0, 2, -150] as [number, number, number],
+    position: [0, 2, -164] as [number, number, number],
     radius: 46,
   },
 }

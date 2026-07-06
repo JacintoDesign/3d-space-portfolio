@@ -1,12 +1,12 @@
 import { useGame } from '../store/useGame'
 import { useShip } from '../store/useShip'
-import { LANDMARKS } from '../data/world'
+import { LANDMARKS, WORLD } from '../data/world'
 
 // World → radar (0..100) mapping. Forward (-Z) is up.
-const X_MIN = -62
-const X_MAX = 62
-const Z_MIN = -196
-const Z_MAX = 36
+const X_MIN = -74
+const X_MAX = 74
+const Z_MIN = -220
+const Z_MAX = 58
 const sx = (x: number) => ((x - X_MIN) / (X_MAX - X_MIN)) * 100
 const sy = (z: number) => ((z - Z_MIN) / (Z_MAX - Z_MIN)) * 100
 
@@ -60,7 +60,7 @@ export function Radar() {
               )
             })}
           {/* the gateway shows on both sides — it's the way home */}
-          <circle cx={sx(0)} cy={sy(-150)} r={2.4} fill="#9fe9ff" opacity={0.9} className="blip" />
+          <circle cx={sx(WORLD.gateway.position[0])} cy={sy(WORLD.gateway.position[2])} r={2.4} fill="#9fe9ff" opacity={0.9} className="blip" />
 
           <g transform={`translate(${sx(px)} ${sy(pz)}) rotate(${shipDeg})`}>
             <polygon points="0,-3.4 2.6,3 0,1.4 -2.6,3" className="ship-marker" />

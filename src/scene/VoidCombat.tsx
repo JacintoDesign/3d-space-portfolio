@@ -4,6 +4,7 @@ import { useKeyboardControls } from '@react-three/drei'
 import * as THREE from 'three'
 import type { Controls } from '../ship/keyboardMap'
 import { useGame, VOID_ASTEROID_SCORES, type AsteroidSizeTier } from '../store/useGame'
+import { useInput } from '../store/useInput'
 
 const MAX_ASTEROIDS = 120
 const MAX_LASERS = 24
@@ -297,11 +298,12 @@ export function VoidCombat({ shipRef }: { shipRef: RefObject<THREE.Group | null>
     }
 
     const keys = getKeys()
-    if (keys.fire && !fireLatch.current) {
+    const firing = keys.fire || useInput.getState().fire
+    if (firing && !fireLatch.current) {
       fireLaser(ship)
       fireLatch.current = true
     }
-    if (!keys.fire) fireLatch.current = false
+    if (!firing) fireLatch.current = false
 
     fwd.set(0, 0, -1).applyQuaternion(ship.quaternion).normalize()
     const drift = fwd.clone().multiplyScalar(-ASTEROID_SPEED * d)

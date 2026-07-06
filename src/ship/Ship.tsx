@@ -1,4 +1,4 @@
-import { useEffect, useRef, type RefObject } from 'react'
+import { useEffect, useRef, useMemo, type RefObject } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import { useKeyboardControls } from '@react-three/drei'
 import * as THREE from 'three'
@@ -44,6 +44,7 @@ const AP_ARRIVE = 0.6
 const AP_CANCEL_STEER = 0.45
 
 const MOUSE_STEER_SENS = 0.0048 // rad per px dragged
+const MOBILE_AIM_ALIGN = 0.98 // dot(forward, target) — hold heading once within this cone
 const DRAG_THRESHOLD = 6 // px before a press is a steer drag, not a station click
 const CURSOR_YAW_RATE = 1.05 // rad/s at full horizontal deflection
 const CURSOR_PITCH_RATE = 0.72
@@ -76,12 +77,12 @@ const right = new THREE.Vector3()
 const qTmp = new THREE.Quaternion()
 const boundsCenter = new THREE.Vector3(...WORLD.bounds.center)
 // The void has its own play-volume, centred beyond the portal so drifting never
-// yanks you back through it — the gateway (z≈-150) sits just inside the near rim.
-const VOID_CENTER = new THREE.Vector3(0, 0, -310)
+// yanks you back through it — the gateway (z≈-164) sits just inside the near rim.
+const VOID_CENTER = new THREE.Vector3(0, 0, -324)
 const VOID_RADIUS = 165
 // Where the ship jumps to when an About/Contact warp cinematic begins — deep in
 // the void, clear of the gateway ring, so the auto-return home is a short hop.
-const VOID_ANCHOR = new THREE.Vector3(0, 0, -270)
+const VOID_ANCHOR = new THREE.Vector3(0, 0, -284)
 // How far void-side of the gate to drop the ship for an express run — lined up
 // on the gate→target line so a straight punch-through threads the ring.
 const GATE_APPROACH_DIST = 14
@@ -94,6 +95,7 @@ export function Ship({ groupRef }: { groupRef: RefObject<THREE.Group | null> }) 
   const motion = useRef<ShipMotion>({ speed: 0, throttle: 0, boost: false, bank: 0 })
   const [, getKeys] = useKeyboardControls<Controls>()
   const gl = useThree((s) => s.gl)
+  const camera = useThree((s) => s.camera)
 
   const speed = useRef(0)
   const telAcc = useRef(0)
@@ -108,6 +110,11 @@ export function Ship({ groupRef }: { groupRef: RefObject<THREE.Group | null> }) 
   const expressPending = useRef(false) // force gate express after leaving a warp cinematic
   const prevZone = useRef<'nebula' | 'void'>('nebula')
   const homeTick = useRef(0)
+  const mobileAimDir = useRef<THREE.Vector3 | null>(null)
+  const mobileAimAligned = useRef(false)
+  const prevMobileAimLock = useRef(false)
+  const ndcAim = useMemo(() => new THREE.Vector2(), [])
+  const mobileRay = useMemo(() => new THREE.Raycaster(), [])
 
   const resetToSpawn = (group: THREE.Group) => {
     group.position.set(...WORLD.spawn)
@@ -125,6 +132,9 @@ export function Ship({ groupRef }: { groupRef: RefObject<THREE.Group | null> }) 
     pointerSteer.pitch = 0
     pointerSteer.cursorX = 0
     pointerSteer.cursorY = 0
+    mobileAimDir.current = null
+    mobileAimAligned.current = false
+    prevMobileAimLock.current = false
     useInput.getState().reset()
   }
 
@@ -206,6 +216,24 @@ export function Ship({ groupRef }: { groupRef: RefObject<THREE.Group | null> }) 
     const input = useInput.getState()
     const keys = getKeys()
 
+    // Mobile THRUST/BOOST: capture a world-space aim ray from the last screen
+    // touch offset at the moment the button is pressed.
+    if (mobile && input.mobileAimLock && !prevMobileAimLock.current) {
+      mobileAimAligned.current = false
+      if (!mobileAimDir.current) mobileAimDir.current = new THREE.Vector3()
+      ndcAim.set(input.steerX, -input.steerY)
+      mobileRay.setFromCamera(ndcAim, camera)
+      mobileAimDir.current.copy(mobileRay.ray.direction).normalize()
+    }
+    if (!input.mobileAimLock) {
+      mobileAimDir.current = null
+      mobileAimAligned.current = false
+    }
+    prevMobileAimLock.current = input.mobileAimLock
+
+    const mobileActionFlight =
+      mobile && playing && input.mobileAimLock && (input.thrust || input.boost)
+
     // Kill void warp the instant we re-enter the nebula — no lingering streaks.
     if (inNebula && prevZone.current === 'void') {
       warpUntil.current = 0
@@ -235,7 +263,7 @@ export function Ship({ groupRef }: { groupRef: RefObject<THREE.Group | null> }) 
     wasCinematic.current = cinematic
 
     // --- gather manual steering intent. Desktop steers with keyboard + mouse
-    //     drag; mobile uses the on-screen d-pad. ---
+    //     drag; mobile uses touch-hold offset from screen centre. ---
     const mouseYaw = pointerSteer.yaw
     const mousePitch = pointerSteer.pitch
     const cursorX = pointerSteer.cursorX
@@ -247,7 +275,7 @@ export function Ship({ groupRef }: { groupRef: RefObject<THREE.Group | null> }) 
     let sx = 0
     let sy = 0
     if (playing) {
-      if (mobile) {
+      if (mobile && !mobileActionFlight) {
         sx = input.steerX
         sy = input.steerY
       }
@@ -442,6 +470,27 @@ export function Ship({ groupRef }: { groupRef: RefObject<THREE.Group | null> }) 
       }
     }
 
+    // Mobile action flight: steer toward the captured world aim, then hold heading.
+    if (mobileActionFlight && mobileAimDir.current) {
+      if (mobileAimAligned.current) {
+        sx = 0
+        sy = 0
+      } else {
+        forward.set(0, 0, -1).applyQuaternion(group.quaternion)
+        const aimDir = mobileAimDir.current
+        if (forward.dot(aimDir) > MOBILE_AIM_ALIGN) {
+          mobileAimAligned.current = true
+          sx = 0
+          sy = 0
+        } else {
+          const dotH = forward.x * aimDir.x + forward.z * aimDir.z
+          const crossY = forward.z * aimDir.x - forward.x * aimDir.z
+          sx = dotH < 0 ? (crossY > 0 ? -1 : 1) : THREE.MathUtils.clamp(-crossY * AP_YAW_GAIN, -1, 1)
+          sy = THREE.MathUtils.clamp((forward.y - aimDir.y) * AP_PITCH_GAIN, -1, 1)
+        }
+      }
+    }
+
     // --- throttle: no thrust unless applied. Hold W / mobile THRUST to cruise,
     //     Shift / BOOST to boost, S / BRAKE to stop; release thrust and the ship
     //     decelerates to zero — no idle drift. ---
@@ -506,7 +555,7 @@ export function Ship({ groupRef }: { groupRef: RefObject<THREE.Group | null> }) 
     // Auto-level pitch back toward the horizon when no pitch input (arcade feel).
     // Suppressed while hover-parked so the nose can hold on an off-level station.
     forward.set(0, 0, -1).applyQuaternion(group.quaternion)
-    if (!hover.current && Math.abs(sy) < 0.05 && mousePitch === 0 && Math.abs(cursorY) < CURSOR_DEAD && Math.abs(forward.y) > 0.001) {
+    if (!hover.current && !mobileActionFlight && Math.abs(sy) < 0.05 && mousePitch === 0 && Math.abs(cursorY) < CURSOR_DEAD && Math.abs(forward.y) > 0.001) {
       qTmp.setFromAxisAngle(right, forward.y * AUTO_LEVEL * delta)
       group.quaternion.premultiply(qTmp)
     }
