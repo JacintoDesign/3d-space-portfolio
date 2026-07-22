@@ -18,6 +18,7 @@ export function Hud() {
   const throttle = useShip((s) => s.throttle)
   const speed = useShip((s) => s.speed)
   const boosting = useShip((s) => s.boosting)
+  const limiter = useShip((s) => s.limiter)
   const targetId = useShip((s) => s.targetId)
   const targetDist = useShip((s) => s.targetDist)
   const px = useShip((s) => s.px)
@@ -45,6 +46,13 @@ export function Hud() {
         <span className="b br" />
         <span className="dot" />
       </div>
+
+      {/* attitude limiter — nose held short of vertical, easing back level */}
+      {limiter && (
+        <div className="attitude-chip" role="status">
+          ◈ ATTITUDE ASSIST · LEVELING TO HORIZON
+        </div>
+      )}
 
       {/* void warp transit — drop out to enter the asteroid belt */}
       {zone === 'void' && voidWarp && (

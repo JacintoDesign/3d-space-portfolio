@@ -39,6 +39,21 @@ export function AboutCinematic() {
           ))}
         </div>
 
+        <a
+          className="cine-course"
+          href={about.course.url}
+          target="_blank"
+          rel="noreferrer"
+          style={{ animationDelay: '1.7s' }}
+        >
+          <span className="cc-label">{about.course.label}</span>
+          <span className="cc-title">{about.course.title}</span>
+          <span className="cc-link">{about.course.linkLabel} ↗</span>
+        </a>
+        <p className="cine-now" style={{ animationDelay: '1.85s' }}>
+          <b>{about.now.label}:</b> {about.now.title} — in progress at Zero to Mastery.
+        </p>
+
         <p className="cine-hint">ESC — return to the stick</p>
       </div>
 

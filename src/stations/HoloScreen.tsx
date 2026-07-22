@@ -4,12 +4,15 @@ import { Billboard } from '@react-three/drei'
 import * as THREE from 'three'
 import { ProjectScreen } from '../buildings/ProjectScreen'
 import { useOptionalVideoTexture } from '../buildings/useOptionalVideoTexture'
+import { useOptionalImageTexture } from '../buildings/useOptionalImageTexture'
 
 interface HoloScreenProps {
   label: string
   subtitle?: string
   color: string
   video?: string
+  /** Screenshot fallback when there's no demo clip (or while it loads). */
+  image?: string
   active: boolean
   size?: [number, number]
   position?: [number, number, number]
@@ -72,11 +75,14 @@ export function HoloScreen({
   subtitle,
   color,
   video,
+  image,
   active,
   size = [5, 2.8],
   position = [0, 0, 0],
 }: HoloScreenProps) {
-  const tex = useOptionalVideoTexture(video, active)
+  const videoTex = useOptionalVideoTexture(video, active)
+  const imageTex = useOptionalImageTexture(image, size[0] / size[1])
+  const tex = videoTex ?? imageTex
   const root = useRef<THREE.Group>(null)
   const basePos = useMemo(() => new THREE.Vector3(...position), [position])
   const panel = useRef<THREE.Group>(null)

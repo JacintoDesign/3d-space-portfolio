@@ -36,6 +36,16 @@ const PITCH_RATE = 0.95
 const MAX_BANK = 0.62
 const AUTO_LEVEL = 0.9
 
+// Attitude limiter: the arcade flight model has no roll axis, so a nose that
+// crosses vertical flips the ship onto its back (yaw + auto-level then work in
+// reverse). The nose soft-stops short of vertical instead: beyond SOFT the ship
+// eases back toward the horizon (stronger with depth, the graceful redirect);
+// HARD is an absolute stop it can never cross. Values are sin(pitch).
+const CLIMB_SOFT = Math.sin(THREE.MathUtils.degToRad(55))
+const CLIMB_HARD = Math.sin(THREE.MathUtils.degToRad(68))
+const LIMITER_EASE = 1.5 // rad/s of ease-back at full soft-zone depth
+const LIMITER_HUD_S = 0.7 // how long the HUD "attitude assist" cue lingers
+
 // Autopilot shaping: steering gains + arrival distance (fraction of dock range).
 const AP_YAW_GAIN = 3
 const AP_PITCH_GAIN = 2.6
@@ -110,6 +120,7 @@ export function Ship({ groupRef }: { groupRef: RefObject<THREE.Group | null> }) 
   const expressPending = useRef(false) // force gate express after leaving a warp cinematic
   const prevZone = useRef<'nebula' | 'void'>('nebula')
   const homeTick = useRef(0)
+  const limiterUntil = useRef(0) // attitude-limiter HUD cue lingers until (sim time)
   const mobileAimDir = useRef<THREE.Vector3 | null>(null)
   const mobileAimAligned = useRef(false)
   const prevMobileAimLock = useRef(false)
@@ -127,6 +138,7 @@ export function Ship({ groupRef }: { groupRef: RefObject<THREE.Group | null> }) 
     apRouted.current = null
     expressPending.current = false
     dockLatch.current = null
+    limiterUntil.current = 0
     pointerSteer.moved = false
     pointerSteer.yaw = 0
     pointerSteer.pitch = 0
@@ -554,10 +566,33 @@ export function Ship({ groupRef }: { groupRef: RefObject<THREE.Group | null> }) 
     }
     // Auto-level pitch back toward the horizon when no pitch input (arcade feel).
     // Suppressed while hover-parked so the nose can hold on an off-level station.
+    // Note the negative sign: a positive rotation about `right` raises the nose,
+    // so leveling a climb (forward.y > 0) needs the opposite rotation.
     forward.set(0, 0, -1).applyQuaternion(group.quaternion)
     if (!hover.current && !mobileActionFlight && Math.abs(sy) < 0.05 && mousePitch === 0 && Math.abs(cursorY) < CURSOR_DEAD && Math.abs(forward.y) > 0.001) {
-      qTmp.setFromAxisAngle(right, forward.y * AUTO_LEVEL * delta)
+      qTmp.setFromAxisAngle(right, -forward.y * AUTO_LEVEL * delta)
       group.quaternion.premultiply(qTmp)
+    }
+
+    // --- attitude limiter: never let the nose cross vertical (no flip-overs).
+    //     Inside the soft cone: ease back toward the horizon, harder with depth.
+    //     At the hard cone: clamp exactly — pitch input slides along the limit. ---
+    forward.set(0, 0, -1).applyQuaternion(group.quaternion)
+    let climb = forward.y
+    if (Math.abs(climb) > CLIMB_SOFT) {
+      right.set(1, 0, 0).applyQuaternion(group.quaternion).normalize()
+      const depth = Math.min(1, (Math.abs(climb) - CLIMB_SOFT) / (CLIMB_HARD - CLIMB_SOFT))
+      qTmp.setFromAxisAngle(right, -climb * depth * LIMITER_EASE * delta)
+      group.quaternion.premultiply(qTmp)
+      forward.set(0, 0, -1).applyQuaternion(group.quaternion)
+      climb = forward.y
+      if (Math.abs(climb) > CLIMB_HARD) {
+        const over = Math.asin(Math.min(1, Math.abs(climb))) - Math.asin(CLIMB_HARD)
+        qTmp.setFromAxisAngle(right, -Math.sign(climb) * over)
+        group.quaternion.premultiply(qTmp)
+      }
+      // Surface the assist on the HUD once it's doing real work.
+      if (playing && depth > 0.5) limiterUntil.current = time.current + LIMITER_HUD_S
     }
     group.quaternion.normalize()
 
@@ -687,6 +722,7 @@ export function Ship({ groupRef }: { groupRef: RefObject<THREE.Group | null> }) 
         throttle: norm,
         speed: speed.current,
         boosting: motion.current.boost,
+        limiter: time.current < limiterUntil.current,
         targetId: nearestId,
         targetDist: nearestId ? Math.max(0, nearestCenter) : 0,
         px: group.position.x,

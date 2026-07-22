@@ -1,5 +1,6 @@
 import { useMemo } from 'react'
 import * as THREE from 'three'
+import { Billboard } from '@react-three/drei'
 import { makeSignTexture } from '../scene/signTexture'
 
 interface NeonTextProps {
@@ -40,13 +41,16 @@ interface StationSignProps {
 
 /**
  * Station signage: a tall Japanese blade-sign hanging off one side and a Latin
- * neon nameplate above the core. Faces the lane (+Z, toward the incoming ship).
+ * neon nameplate above the core. The nameplate billboards toward the camera so
+ * the station reads from any approach direction; the blade stays scenery.
  */
 export function StationSign({ sign, signJP, color, radius }: StationSignProps) {
   return (
     <group position={[0, 0, radius * 0.62]}>
-      {/* Latin nameplate, above the core */}
-      <NeonText text={sign} color={color} height={1.5} position={[0, radius * 1.15, 0]} />
+      {/* Latin nameplate, above the core — always faces the player */}
+      <Billboard position={[0, radius * 1.15, 0]}>
+        <NeonText text={sign} color={color} height={1.5} />
+      </Billboard>
 
       {/* Japanese vertical blade sign, off to the right */}
       <NeonText text={signJP} color={color} vertical height={radius * 1.5} position={[radius * 1.05, 0, 0.1]} />

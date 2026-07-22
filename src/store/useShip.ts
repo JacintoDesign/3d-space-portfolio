@@ -11,6 +11,8 @@ interface ShipState {
   speed: number
   /** Boost engaged. */
   boosting: boolean
+  /** Attitude limiter actively easing the nose back toward the horizon. */
+  limiter: boolean
   /** Nearest dockable station id + its distance (null when none in sensor range). */
   targetId: string | null
   targetDist: number
@@ -26,6 +28,7 @@ export const useShip = create<ShipState>((set) => ({
   throttle: 0,
   speed: 0,
   boosting: false,
+  limiter: false,
   targetId: null,
   targetDist: 0,
   px: 0,

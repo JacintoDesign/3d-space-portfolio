@@ -233,11 +233,35 @@
   line-height: 1.7;
   color: #cfd3f0;
 }
+/* project hero media — screenshot or looping demo clip */
+.shot {
+  margin: 18px 0 20px;
+  border: 1px solid color-mix(in srgb, var(--accent, var(--neon-cyan)) 35%, transparent);
+  border-radius: 4px;
+  overflow: hidden;
+  background: #05060d;
+  box-shadow: 0 14px 44px -18px color-mix(in srgb, var(--accent, var(--neon-cyan)) 55%, transparent);
+}
+.shot img,
+.shot video {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1920 / 1020;
+  /* Keep the hero visible AND the action buttons above the fold. */
+  max-height: min(44vh, 460px);
+  object-fit: cover;
+  object-position: top;
+}
+.panel .desc {
+  margin: 20px 0 0;
+  font-size: clamp(13.5px, 1.6vw, 15px);
+}
+
 .tech-row {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  margin: 22px 0;
+  margin: 22px 0 0;
 }
 .chip {
   font-size: 11px;
@@ -288,6 +312,14 @@
 .btn.ghost:hover {
   border-color: #fff;
   box-shadow: none;
+}
+/* project overlay: two large, equal, unmissable actions */
+.btn-row.big .btn {
+  flex: 1 1 220px;
+  justify-content: center;
+  padding: 17px 28px;
+  font-size: 15px;
+  letter-spacing: 0.12em;
 }
 
 /* About stats */
@@ -678,6 +710,26 @@
   font-size: 11px;
   letter-spacing: 0.2em;
   color: var(--text-dim);
+}
+
+/* attitude limiter cue — under the reticle, out of the way of dock lock */
+.attitude-chip {
+  position: absolute;
+  left: 50%;
+  top: calc(50% - 118px);
+  transform: translateX(-50%);
+  padding: 8px 16px;
+  border-radius: 999px;
+  border: 1px solid rgba(249, 248, 113, 0.5);
+  background: rgba(8, 10, 22, 0.72);
+  backdrop-filter: blur(8px);
+  box-shadow: 0 0 18px -6px rgba(249, 248, 113, 0.6);
+  color: #f9f871;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10.5px;
+  letter-spacing: 0.22em;
+  white-space: nowrap;
+  animation: fade 0.2s ease;
 }
 
 .hud-left {
@@ -1089,6 +1141,20 @@
   pointer-events: auto;
   max-width: min(560px, 60vw);
   padding-left: clamp(20px, 5vw, 72px);
+  /* Copy can outgrow short viewports (stats + course panel) — scroll, don't clip. */
+  max-height: 100vh;
+  overflow-y: auto;
+  padding-top: clamp(60px, 9vh, 100px);
+  padding-bottom: 28px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(95, 233, 255, 0.25) transparent;
+}
+.cine-copy::-webkit-scrollbar {
+  width: 4px;
+}
+.cine-copy::-webkit-scrollbar-thumb {
+  background: rgba(95, 233, 255, 0.25);
+  border-radius: 2px;
 }
 .cine-eyebrow {
   display: flex;
@@ -1146,6 +1212,66 @@
 .cine-stat .label {
   font-size: 10px;
   letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+.cine-course {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin: 24px 0 0;
+  padding: 14px 16px;
+  max-width: 460px;
+  border: 1px solid rgba(5, 217, 232, 0.28);
+  border-left: 3px solid var(--neon-cyan);
+  border-radius: 2px;
+  background: rgba(5, 217, 232, 0.06);
+  text-decoration: none;
+  pointer-events: auto;
+  animation: cineRise 0.7s ease backwards;
+  transition: border-color 0.2s, background 0.2s;
+}
+.cine-course:hover {
+  border-color: var(--neon-cyan);
+  background: rgba(5, 217, 232, 0.12);
+  text-decoration: none;
+}
+.cine-course .cc-label {
+  font-size: 10px;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: var(--neon-cyan);
+}
+.cine-course .cc-title {
+  font-size: clamp(13px, 1.4vw, 15.5px);
+  font-weight: 700;
+  line-height: 1.4;
+  color: #fff;
+}
+.cine-course .cc-link {
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--neon-cyan);
+}
+.cine-now {
+  margin: 12px 0 0;
+  font-size: clamp(11.5px, 1.15vw, 13px);
+  line-height: 1.6;
+  color: var(--text-dim);
+  animation: cineRise 0.7s ease backwards;
+}
+.cine-now b {
+  color: #d9dcf5;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  font-size: 0.85em;
+}
+.cine-loc {
+  margin: 16px 0 0;
+  font-size: 11px;
+  letter-spacing: 0.22em;
   text-transform: uppercase;
   color: var(--text-dim);
 }

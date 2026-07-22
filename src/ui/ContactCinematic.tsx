@@ -90,6 +90,7 @@ export function ContactCinematic() {
             </a>
           ))}
         </div>
+        <p className="cine-loc">◈ {STUDIO.location}</p>
 
         <p className="cine-hint">ESC — return to the stick</p>
       </div>
