@@ -60,8 +60,10 @@ const MOON_FRAG = /* glsl */ `
     vec3 col = mix(uDark, uLit, lit) * albedo + uDark * 0.08;
 
     // Subtle fresnel limb catching the nebula glow (kept low so it stays a moon,
-    // not a light bulb).
-    float fres = pow(1.0 - max(dot(n, normalize(vView)), 0.0), 3.5);
+    // not a light bulb). The dot MUST be clamped above too: fp32 rounding can
+    // push it past 1.0, and pow(negative, 3.5) is NaN — one NaN pixel here gets
+    // smeared over the whole frame by Bloom's mip chain (the black flicker bug).
+    float fres = pow(clamp(1.0 - dot(n, normalize(vView)), 0.0, 1.0), 3.5);
     col += uRim * fres * (0.25 + 0.35 * lit);
 
     gl_FragColor = vec4(col, 1.0);

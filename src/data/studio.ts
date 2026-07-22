@@ -29,12 +29,6 @@ export const STUDIO = {
       url: 'https://zerotomastery.io/courses/learn-vibe-coding/',
       linkLabel: 'View the course',
     },
-    now: {
-      label: 'Currently building',
-      title: 'Agentic Engineering course',
-      blurb:
-        'Go from vibe-coding to Agentic Engineering — plan, direct, and ship products that survive contact with reality, with Claude Code, Cursor, Codex and Antigravity.',
-    },
   },
   contact: {
     sign: 'CONTACT',

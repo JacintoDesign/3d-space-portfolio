@@ -24,7 +24,9 @@ const PORTAL_FRAG = /* glsl */ `
   void main() {
     vec2 c = vUv * 2.0 - 1.0;
     float r = length(c);
-    float ang = atan(c.y, c.x);
+    // atan(0,0) is undefined (NaN on some GPUs) — dead-center guard. The rim
+    // term is 0 there anyway, so the angle value doesn't matter visually.
+    float ang = (r > 1e-4) ? atan(c.y, c.x) : 0.0;
 
     // layered angular waves — the surface never sits still
     float w =

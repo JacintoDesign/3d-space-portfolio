@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { useGame } from '../store/useGame'
 import { STUDIO, FORMSUBMIT_ENDPOINT } from '../data/studio'
+import { MailIcon, SocialIcon } from './SocialIcons'
 
 type Status = 'idle' | 'sending' | 'ok' | 'err'
 
@@ -82,11 +83,23 @@ export function ContactCinematic() {
           </form>
         )}
 
-        <div className="socials">
-          <a href={`mailto:${STUDIO.email}`}>{STUDIO.email}</a>
+        <a className="socials-mail" href={`mailto:${STUDIO.email}`}>
+          <MailIcon className="mail-ic" /> {STUDIO.email}
+        </a>
+
+        {/* social channels — icon row */}
+        <div className="socials-icons">
           {STUDIO.socials.map((s) => (
-            <a key={s.label} href={s.href} target="_blank" rel="noreferrer">
-              {s.label}
+            <a
+              key={s.label}
+              className="social-icon"
+              href={s.href}
+              target="_blank"
+              rel="noreferrer"
+              aria-label={s.label}
+              title={s.label}
+            >
+              <SocialIcon label={s.label} />
             </a>
           ))}
         </div>

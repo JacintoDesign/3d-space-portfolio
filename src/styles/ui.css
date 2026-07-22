@@ -152,7 +152,11 @@
   pointer-events: auto;
   display: grid;
   place-items: center;
-  padding: clamp(16px, 4vw, 48px);
+  /* Reserve the top-nav band (z-30 chrome stays above the scrim) so the
+     docked card can never slide up underneath the menu. */
+  --chrome-top: clamp(84px, 13vh, 124px);
+  --chrome-bottom: clamp(16px, 4vh, 40px);
+  padding: var(--chrome-top) clamp(16px, 4vw, 48px) var(--chrome-bottom);
   animation: fade 0.25s ease;
 }
 @keyframes fade {
@@ -162,7 +166,7 @@
 .panel {
   position: relative;
   width: min(960px, 100%);
-  max-height: 86vh;
+  max-height: calc(100vh - var(--chrome-top, 84px) - var(--chrome-bottom, 16px));
   overflow-y: auto;
   border-radius: 3px;
   /* dog-eared terminal card: notched top-left + bottom-right corners */
@@ -213,6 +217,8 @@
   text-transform: uppercase;
   color: var(--accent, var(--neon-cyan));
   margin: 0 0 10px;
+  /* keep the wrapping meta line clear of the absolute ✕ button */
+  padding-right: 52px;
 }
 .eyebrow::before {
   content: '// ';
@@ -410,21 +416,54 @@
 .form-status.err {
   color: var(--neon-pink);
 }
-.socials {
-  display: flex;
-  gap: 18px;
+/* contact: email line + a dedicated row of social icon buttons */
+.socials-mail {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
   margin-top: 22px;
-  flex-wrap: wrap;
-}
-.socials a {
   font-size: 13px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--text-dim);
   pointer-events: auto;
 }
-.socials a:hover {
+.socials-mail .mail-ic {
+  width: 16px;
+  height: 16px;
+}
+.socials-mail:hover {
   color: var(--neon-cyan);
+  text-decoration: none;
+}
+.socials-icons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 14px;
+}
+.social-icon {
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(10, 12, 26, 0.55);
+  display: grid;
+  place-items: center;
+  color: var(--text-dim);
+  pointer-events: auto;
+  transition: border-color 0.2s, color 0.2s, transform 0.2s, box-shadow 0.2s;
+}
+.social-icon svg {
+  width: 20px;
+  height: 20px;
+}
+.social-icon:hover {
+  border-color: var(--neon-cyan);
+  color: #fff;
+  transform: translateY(-2px);
+  box-shadow: 0 0 16px -6px var(--neon-cyan);
+  text-decoration: none;
 }
 
 /* ============================ Loader =================================== */
@@ -1254,20 +1293,6 @@
   text-transform: uppercase;
   color: var(--neon-cyan);
 }
-.cine-now {
-  margin: 12px 0 0;
-  font-size: clamp(11.5px, 1.15vw, 13px);
-  line-height: 1.6;
-  color: var(--text-dim);
-  animation: cineRise 0.7s ease backwards;
-}
-.cine-now b {
-  color: #d9dcf5;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  font-size: 0.85em;
-}
 .cine-loc {
   margin: 16px 0 0;
   font-size: 11px;
@@ -1323,9 +1348,6 @@
   margin-top: 18px;
   max-width: 460px;
   animation: cineRise 0.7s ease backwards;
-}
-.about-cine .socials {
-  margin-top: 18px;
 }
 
 /* portal transit flash */

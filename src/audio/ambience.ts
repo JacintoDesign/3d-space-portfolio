@@ -1,26 +1,14 @@
 /**
- * Synthesized deep-space ambience via the Web Audio API — a low drone pad, a bed
- * of filtered "solar wind", slow sonar pings, and a throttle-reactive engine hum.
- * No asset files. Must be started from a user gesture (the LAUNCH button).
+ * Synthesized deep-space ambience via the Web Audio API — a low drone pad,
+ * slow sonar pings, and a throttle-reactive engine hum. No asset files. Must
+ * be started from a user gesture (the LAUNCH button).
  */
 let ctx: AudioContext | null = null
 let master: GainNode | null = null
 let engineGain: GainNode | null = null
-let pingTimer: ReturnType<typeof setInterval> | null = null
 let started = false
 
 const BASE_LEVEL = 0.16
-
-function buildNoise(context: AudioContext): AudioBufferSourceNode {
-  const seconds = 3
-  const buffer = context.createBuffer(1, context.sampleRate * seconds, context.sampleRate)
-  const data = buffer.getChannelData(0)
-  for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1
-  const src = context.createBufferSource()
-  src.buffer = buffer
-  src.loop = true
-  return src
-}
 
 export function startAmbience() {
   if (started) return
@@ -64,26 +52,6 @@ export function startAmbience() {
     lfoGain.connect(droneLp.frequency)
     lfo.start()
 
-    // --- Solar wind: bandpassed noise, very airy ---
-    const wind = buildNoise(ctx)
-    const bp = ctx.createBiquadFilter()
-    bp.type = 'bandpass'
-    bp.frequency.value = 600
-    bp.Q.value = 0.7
-    const windGain = ctx.createGain()
-    windGain.gain.value = 0.06
-    wind.connect(bp)
-    bp.connect(windGain)
-    windGain.connect(master)
-    wind.start()
-    const windLfo = ctx.createOscillator()
-    windLfo.frequency.value = 0.08
-    const windLfoGain = ctx.createGain()
-    windLfoGain.gain.value = 400
-    windLfo.connect(windLfoGain)
-    windLfoGain.connect(bp.frequency)
-    windLfo.start()
-
     // --- Engine hum: throttle-reactive, driven externally via setEngine() ---
     engineGain = ctx.createGain()
     engineGain.gain.value = 0.04
@@ -117,7 +85,9 @@ export function startAmbience() {
       osc.start(t)
       osc.stop(t + 1.5)
     }
-    pingTimer = setInterval(ping, 9000)
+    // Silent when muted (routes through `master`, whose gain is 0) — runs for
+    // the page lifetime, no need to pause/resume on mute toggles.
+    setInterval(ping, 9000)
 
     // Fade in.
     master.gain.linearRampToValueAtTime(BASE_LEVEL, ctx.currentTime + 2.0)
@@ -173,8 +143,4 @@ export function setMuted(muted: boolean) {
   if (!ctx || !master) return
   master.gain.cancelScheduledValues(ctx.currentTime)
   master.gain.linearRampToValueAtTime(muted ? 0 : BASE_LEVEL, ctx.currentTime + 0.4)
-  if (muted && pingTimer) {
-    clearInterval(pingTimer)
-    pingTimer = null
-  }
 }

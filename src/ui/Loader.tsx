@@ -52,9 +52,11 @@ export function Loader() {
 
   const enter = () => {
     setLeaving(true)
+    // Prime the audio graph from this user gesture (required by autoplay
+    // policy) but respect the default-muted state — sound stays off until the
+    // player opts in via the topbar toggle.
     startAmbience()
-    setMuted(false)
-    useGame.setState({ muted: false })
+    setMuted(useGame.getState().muted)
     setTimeout(() => setReady(), 650)
   }
 
