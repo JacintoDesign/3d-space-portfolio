@@ -29,7 +29,7 @@ const CINE_NDC_X = 0.46
 
 // Parked (autopilot hover): frame the docked station dead-centre with the ship
 // tucked into the lower-foreground so the station you flew to fills the view.
-const PARK_BACK = 9
+const PARK_BACK = 13
 const PARK_UP = 3.4
 const PARK_SIDE = 4.6
 
@@ -122,13 +122,17 @@ export function ChaseCamera({ targetRef }: { targetRef: RefObject<THREE.Group | 
       stationPos.set(...parkedLm.position)
       axis.copy(stationPos).sub(ship.position)
       if (axis.lengthSq() < 1e-4) axis.copy(fwd)
+      const shipDistance = axis.length()
       axis.normalize()
+      // Keep the full solar span and blade sign inside narrow portrait viewports.
+      const fitDistance = parkedLm.radius * 2.35 / (Math.tan(THREE.MathUtils.degToRad(BASE_FOV / 2)) * camera.aspect)
+      const parkBack = Math.max(PARK_BACK, fitDistance - shipDistance)
       side.crossVectors(axis, WORLD_UP)
       if (side.lengthSq() < 1e-4) side.set(1, 0, 0)
       side.normalize()
       desired
         .copy(ship.position)
-        .addScaledVector(axis, -PARK_BACK)
+        .addScaledVector(axis, -parkBack)
         .addScaledVector(WORLD_UP, PARK_UP)
         .addScaledVector(side, PARK_SIDE)
     } else {
@@ -174,7 +178,7 @@ export function ChaseCamera({ targetRef }: { targetRef: RefObject<THREE.Group | 
       const shipSide = m === 'about' ? 1 : -1
       look.copy(ship.position).addScaledVector(side, -shipSide * CINE_NDC_X * distShip * tanX)
     } else if (parkedLm) {
-      look.copy(stationPos)
+      look.copy(stationPos).addScaledVector(WORLD_UP, parkedLm.radius * 0.35)
     } else {
       look.copy(ship.position).addScaledVector(fwd, LOOK_AHEAD).addScaledVector(up, 0.5)
     }

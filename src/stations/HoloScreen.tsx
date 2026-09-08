@@ -2,6 +2,7 @@ import { useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { Billboard } from '@react-three/drei'
 import * as THREE from 'three'
+import { useGame } from '../store/useGame'
 import { ProjectScreen } from '../buildings/ProjectScreen'
 import { useOptionalVideoTexture } from '../buildings/useOptionalVideoTexture'
 import { useOptionalImageTexture } from '../buildings/useOptionalImageTexture'
@@ -111,29 +112,29 @@ export function HoloScreen({
   const arcR = Math.hypot(w, h) * 0.58
 
   useFrame((_, delta) => {
-    t.current += delta
+    const reduced = useGame.getState().reducedMotion
+    if (!reduced) t.current += Math.min(delta, 0.05)
     holoMat.uniforms.uTime.value = t.current
-    // Grow the projection + float it forward/up when docked so the demo reads
-    // big and clears the station body in the parked framing.
+    // Enlarge within the overhead layout without drifting outside the camera frame.
     if (root.current) {
       const k = Math.min(1, delta * 4)
-      const s = root.current.scale.x + ((active ? 1.55 : 1) - root.current.scale.x) * k
+      const s = root.current.scale.x + ((active ? 1.25 : 1) - root.current.scale.x) * k
       root.current.scale.setScalar(s)
-      const ty = basePos.y + (active ? 2 : 0)
-      const tz = basePos.z + (active ? 5.5 : 0)
+      const ty = basePos.y
+      const tz = basePos.z
       root.current.position.x = basePos.x
       root.current.position.y += (ty - root.current.position.y) * k
       root.current.position.z += (tz - root.current.position.z) * k
     }
-    if (panel.current) {
+    if (panel.current && !reduced) {
       panel.current.position.y = Math.sin(t.current * 1.2) * 0.08
       // occasional hologram stutter
       const glitch = Math.sin(t.current * 23.0) > 0.985 ? 0.94 : 1
       panel.current.scale.setScalar((0.985 + Math.sin(t.current * 9) * 0.012) * glitch)
     }
-    if (arcA.current) arcA.current.rotation.z += delta * 0.5
-    if (arcB.current) arcB.current.rotation.z -= delta * 0.32
-    if (emitter.current) {
+    if (arcA.current && !reduced) arcA.current.rotation.z += delta * 0.5
+    if (arcB.current && !reduced) arcB.current.rotation.z -= delta * 0.32
+    if (emitter.current && !reduced) {
       emitter.current.rotation.y += delta * 1.4
       const s = 1 + Math.sin(t.current * 5) * 0.12
       emitter.current.scale.setScalar(s)
@@ -148,7 +149,7 @@ export function HoloScreen({
           {tex ? (
             <mesh>
               <planeGeometry args={size} />
-              <meshBasicMaterial map={tex} toneMapped={false} transparent opacity={0.88} />
+              <meshBasicMaterial map={tex} color="#9ba9bb" toneMapped={false} transparent opacity={0.92} />
             </mesh>
           ) : (
             <ProjectScreen label={label} subtitle={subtitle} color={color} size={size} active={active} />
@@ -190,13 +191,13 @@ export function HoloScreen({
           </mesh>
 
           {/* emitter node + light thread up to the screen */}
-          <group position={[0, -h / 2 - 1.05, 0]}>
+          <group position={[0, -h / 2 - 0.55, 0]}>
             <mesh ref={emitter}>
               <octahedronGeometry args={[0.22, 0]} />
               <meshBasicMaterial color={color} toneMapped={false} />
             </mesh>
-            <mesh position={[0, 0.55, 0]}>
-              <planeGeometry args={[0.045, 1]} />
+            <mesh position={[0, 0.3, 0]}>
+              <planeGeometry args={[0.035, 0.5]} />
               <meshBasicMaterial
                 color={color}
                 transparent
