@@ -42,24 +42,22 @@ interface StationSignProps {
 /**
  * Station signage: a tall Japanese blade-sign hanging off one side and a Latin
  * neon nameplate above the core. The nameplate billboards toward the camera so
- * the station reads from any approach direction; the blade stays scenery.
+ * both signs read from any approach direction.
  */
 export function StationSign({ sign, signJP, color, radius }: StationSignProps) {
   return (
-    <group position={[0, 0, radius * 0.62]}>
-      {/* Latin nameplate, above the core — always faces the player */}
-      <Billboard position={[0, radius * 1.15, 0]}>
-        <NeonText text={sign} color={color} height={1.5} />
-      </Billboard>
+    <Billboard>
+      {/* Keep the nameplate clear of the mounted communications equipment. */}
+      <NeonText text={sign} color={color} height={1.05} position={[0, radius * 1.48, 0]} />
 
       {/* Japanese vertical blade sign, off to the right */}
-      <NeonText text={signJP} color={color} vertical height={radius * 1.5} position={[radius * 1.05, 0, 0.1]} />
+      <NeonText text={signJP} color={color} vertical height={radius * 0.8} position={[radius * 1.85, 0, 0.1]} />
 
       {/* thin mounting post for the blade */}
-      <mesh position={[radius * 1.05, 0, -0.05]}>
-        <boxGeometry args={[0.06, radius * 1.7, 0.06]} />
+      <mesh position={[radius * 1.85, 0, -0.05]}>
+        <boxGeometry args={[0.06, radius * 0.95, 0.06]} />
         <meshBasicMaterial color={color} toneMapped={false} />
       </mesh>
-    </group>
+    </Billboard>
   )
 }
