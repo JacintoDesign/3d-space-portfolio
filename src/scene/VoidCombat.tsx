@@ -4,12 +4,13 @@ import { useKeyboardControls } from '@react-three/drei'
 import * as THREE from 'three'
 import type { Controls } from '../ship/keyboardMap'
 import { useGame, VOID_ASTEROID_SCORES, type AsteroidSizeTier } from '../store/useGame'
+import { createAsteroidGeometry } from './asteroidGeometry'
 import { useInput } from '../store/useInput'
 
 const MAX_ASTEROIDS = 120
 const MAX_LASERS = 24
 const MAX_EXPLOSIONS = 20
-const DEBRIS_PER = 18
+const DEBRIS_PER = 6
 const SPARKS_PER = 14
 const EXPLOSION_LIFE = 1.35
 const ASTEROID_SPEED = 7
@@ -17,7 +18,8 @@ const LASER_SPEED = 140
 const SPAWN_INTERVAL = 0.38
 const SPAWN_BURST = 3
 const SPAWN_RADIUS = 95
-const HIT_RADIUS = 2.8
+const HIT_RADIUS = 0.22
+const FIRE_INTERVAL = 0.2
 const GUN_FWD = 2.2
 const GUN_SIDE = 0.85
 const AIM_DIST = 120
@@ -48,6 +50,11 @@ type Asteroid = {
   spin: number
   phase: number
   alive: boolean
+  vx: number
+  vy: number
+  vz: number
+  variant: number
+  birth: number
 }
 type Laser = { x: number; y: number; z: number; dx: number; dy: number; dz: number; life: number; alive: boolean }
 type DebrisSeed = {
@@ -131,7 +138,11 @@ function randSphere(): [number, number, number] {
   ]
 }
 
-export function VoidCombat({ shipRef }: { shipRef: RefObject<THREE.Group | null> }) {
+export function VoidCombat({ shipRef, practice }: {
+  shipRef: RefObject<THREE.Group | null>
+  /** Development bench drives the real projectile and fracture simulation. */
+  practice?: { shot: number; paused: boolean; smallTarget?: boolean; coarseStep?: boolean; onImpact?: () => void; onStats: (stats: { large: number; medium: number; small: number; hits: number }) => void }
+}) {
   const isVoid = useGame((s) => s.zone === 'void')
   const voidWarp = useGame((s) => s.voidWarp)
   const playing = useGame((s) => s.mode === 'play')
@@ -147,7 +158,7 @@ export function VoidCombat({ shipRef }: { shipRef: RefObject<THREE.Group | null>
       tier: 'small' as AsteroidSizeTier,
       spin: 0,
       phase: 0,
-      alive: false,
+      alive: false, vx: 0, vy: 0, vz: 0, variant: 0, birth: 0,
     })),
   )
   const lasers = useRef<Laser[]>(
@@ -174,7 +185,11 @@ export function VoidCombat({ shipRef }: { shipRef: RefObject<THREE.Group | null>
       sparks: seedSparks(),
     })),
   )
-  const astMesh = useRef<THREE.InstancedMesh>(null)
+  const astMeshes = useRef<(THREE.InstancedMesh | null)[]>([])
+  const rockGeometries = useMemo(() => [0, 1, 2].map(createAsteroidGeometry), [])
+  const hits = useRef(0)
+  const reportedAt = useRef(0)
+  const testShot = useRef(0)
   const laserMesh = useRef<THREE.InstancedMesh>(null)
   const flashMesh = useRef<THREE.InstancedMesh>(null)
   const debrisMesh = useRef<THREE.InstancedMesh>(null)
@@ -182,9 +197,9 @@ export function VoidCombat({ shipRef }: { shipRef: RefObject<THREE.Group | null>
   const flashMat = useRef<THREE.MeshBasicMaterial>(null)
   const dummy = useMemo(() => new THREE.Object3D(), [])
   const spawnAcc = useRef(0)
-  const fireLatch = useRef(false)
+  const fireCooldown = useRef(0)
   const fireSide = useRef(0)
-  const prevVoidWarp = useRef(true)
+  const beltSeeded = useRef(false)
   const fwd = useMemo(() => new THREE.Vector3(), [])
   const right = useMemo(() => new THREE.Vector3(), [])
   const spawnPos = useMemo(() => new THREE.Vector3(), [])
@@ -196,6 +211,7 @@ export function VoidCombat({ shipRef }: { shipRef: RefObject<THREE.Group | null>
 
   const spawnAsteroid = (ship: THREE.Group) => {
     const pool = asteroids.current
+    if (pool.filter((a) => a.alive).length >= MAX_ASTEROIDS - 12) return
     const slot = pool.find((a) => !a.alive)
     if (!slot) return
 
@@ -209,16 +225,40 @@ export function VoidCombat({ shipRef }: { shipRef: RefObject<THREE.Group | null>
     slot.r = ASTEROID_TIERS[tier].r
     slot.spin = (Math.random() - 0.5) * 2.2
     slot.phase = Math.random() * Math.PI * 2
+    fwd.set(0, 0, 1).applyQuaternion(ship.quaternion).multiplyScalar(ASTEROID_SPEED)
+    slot.vx = fwd.x
+    slot.vy = fwd.y
+    slot.vz = fwd.z
+    slot.variant = Math.floor(Math.random() * rockGeometries.length)
+    slot.birth = 0
     slot.alive = true
   }
 
   const seedBelt = (ship: THREE.Group) => {
-    for (let i = 0; i < BELT_SEED; i++) spawnAsteroid(ship)
+    if (practice) {
+      const a = asteroids.current[0]
+      Object.assign(a, { x: 0, y: 0, z: -20, r: ASTEROID_TIERS[practice.smallTarget ? 'small' : 'large'].r, tier: practice.smallTarget ? 'small' : 'large', spin: 0.2, phase: 0, alive: true, vx: 0, vy: 0, vz: 0, variant: 0, birth: 0 })
+    } else for (let i = 0; i < BELT_SEED; i++) spawnAsteroid(ship)
   }
 
   const reticleAim = (ship: THREE.Group) => {
+    if (practice) {
+      const target = asteroids.current.filter((a) => a.alive).sort((a, b) => b.r - a.r)[0]
+      if (target) {
+        const lead = Math.hypot(target.x - ship.position.x, target.y - ship.position.y, target.z - ship.position.z) / LASER_SPEED
+        return aimPoint.set(target.x + target.vx * lead, target.y + target.vy * lead, target.z + target.vz * lead)
+      }
+    }
     raycaster.setFromCamera(ndcCenter, camera)
-    aimPoint.copy(raycaster.ray.origin).addScaledVector(raycaster.ray.direction, AIM_DIST)
+    // Converge on the rock under the reticle, avoiding camera/muzzle parallax.
+    let nearest = AIM_DIST
+    for (const a of asteroids.current) {
+      if (!a.alive) continue
+      spawnPos.set(a.x, a.y, a.z).sub(raycaster.ray.origin)
+      const along = spawnPos.dot(raycaster.ray.direction)
+      if (along > 0 && along < nearest && spawnPos.lengthSq() - along * along < a.r * a.r) nearest = along
+    }
+    aimPoint.copy(raycaster.ray.origin).addScaledVector(raycaster.ray.direction, nearest)
     if (!Number.isFinite(aimPoint.x)) {
       fwd.set(0, 0, -1).applyQuaternion(ship.quaternion).normalize()
       aimPoint.copy(ship.position).addScaledVector(fwd, AIM_DIST)
@@ -270,18 +310,55 @@ export function VoidCombat({ shipRef }: { shipRef: RefObject<THREE.Group | null>
     slot.sparks = seedSparks()
   }
 
+  const fracture = (parent: Asteroid) => {
+    const childTier = parent.tier === 'large' ? 'medium' : parent.tier === 'medium' ? 'small' : null
+    const count = parent.tier === 'large' ? 3 : 2
+    // Copy before reusing the parent's pool slot; the field always stays bounded.
+    const source = { ...parent }
+    parent.alive = false
+    if (!childTier) return
+    const childR = ASTEROID_TIERS[childTier].r
+    for (let i = 0; i < count; i++) {
+      // Keep room for the whole split, even if an unusually dense chain fills the pool.
+      const slot = asteroids.current.find((a) => !a.alive) ?? asteroids.current
+        .filter((a) => a.birth === 0)
+        .reduce<Asteroid | undefined>((furthest, a) => !furthest ||
+          Math.hypot(a.x - source.x, a.y - source.y, a.z - source.z) > Math.hypot(furthest.x - source.x, furthest.y - source.y, furthest.z - source.z) ? a : furthest, undefined)
+      if (!slot) break
+      const a = i * Math.PI * 2 / count + source.phase
+      const nx = Math.cos(a)
+      const ny = Math.sin(a)
+      const spread = childR * 1.2
+      Object.assign(slot, {
+        x: source.x + nx * spread, y: source.y + ny * spread, z: source.z,
+        r: childR, tier: childTier, spin: (i % 2 ? -1 : 1) * 0.7, phase: source.phase + i,
+        vx: source.vx + nx * 3.2, vy: source.vy + ny * 3.2, vz: source.vz + (i - (count - 1) / 2) * 0.8,
+        variant: (source.variant + i + 1) % 3, birth: 0.06, alive: true,
+      })
+    }
+  }
+
   useFrame((_, delta) => {
     const ship = shipRef.current
     const inBelt = isVoid && playing && ship && !voidWarp
-    if (astMesh.current) astMesh.current.visible = Boolean(inBelt)
+    for (const mesh of astMeshes.current) if (mesh) mesh.visible = Boolean(inBelt)
     if (laserMesh.current) laserMesh.current.visible = Boolean(inBelt)
     if (flashMesh.current) flashMesh.current.visible = Boolean(inBelt)
     if (debrisMesh.current) debrisMesh.current.visible = Boolean(inBelt)
     if (sparkMesh.current) sparkMesh.current.visible = Boolean(inBelt)
 
     // Dense belt the moment warp drops — not during transit.
-    if (inBelt && prevVoidWarp.current && ship) seedBelt(ship)
-    prevVoidWarp.current = voidWarp
+    if ((!isVoid || voidWarp) && beltSeeded.current) {
+      for (const a of asteroids.current) a.alive = false
+      for (const l of lasers.current) l.alive = false
+      fireCooldown.current = 0
+      spawnAcc.current = 0
+      beltSeeded.current = false
+    }
+    if (inBelt && !beltSeeded.current && ship) {
+      seedBelt(ship)
+      beltSeeded.current = true
+    }
 
     if (!inBelt || !ship) {
       if (!inBelt) {
@@ -290,8 +367,8 @@ export function VoidCombat({ shipRef }: { shipRef: RefObject<THREE.Group | null>
       return
     }
 
-    const d = Math.min(delta, 0.05)
-    spawnAcc.current += d
+    const d = practice?.paused ? 0 : practice?.coarseStep ? 0.05 : Math.min(delta, 0.05)
+    if (!practice) spawnAcc.current += d
     while (spawnAcc.current >= SPAWN_INTERVAL) {
       spawnAcc.current -= SPAWN_INTERVAL
       for (let n = 0; n < SPAWN_BURST; n++) spawnAsteroid(ship)
@@ -299,20 +376,20 @@ export function VoidCombat({ shipRef }: { shipRef: RefObject<THREE.Group | null>
 
     const keys = getKeys()
     const firing = keys.fire || useInput.getState().fire
-    if (firing && !fireLatch.current) {
+    fireCooldown.current = Math.max(0, fireCooldown.current - d)
+    if ((firing && fireCooldown.current === 0) || (practice && practice.shot !== testShot.current)) {
       fireLaser(ship)
-      fireLatch.current = true
+      fireCooldown.current = FIRE_INTERVAL
+      testShot.current = practice?.shot ?? 0
     }
-    if (!firing) fireLatch.current = false
-
-    fwd.set(0, 0, -1).applyQuaternion(ship.quaternion).normalize()
-    const drift = fwd.clone().multiplyScalar(-ASTEROID_SPEED * d)
+    if (!firing && !practice) fireCooldown.current = 0
 
     for (const a of asteroids.current) {
       if (!a.alive) continue
-      a.x += drift.x
-      a.y += drift.y
-      a.z += drift.z
+      a.x += a.vx * d
+      a.y += a.vy * d
+      a.z += a.vz * d
+      a.birth = Math.max(0, a.birth - d)
       a.phase += a.spin * d
 
       const dx = a.x - ship.position.x
@@ -323,27 +400,45 @@ export function VoidCombat({ shipRef }: { shipRef: RefObject<THREE.Group | null>
 
     for (const l of lasers.current) {
       if (!l.alive) continue
-      l.x += l.dx * LASER_SPEED * d
-      l.y += l.dy * LASER_SPEED * d
-      l.z += l.dz * LASER_SPEED * d
+      const sx = l.x, sy = l.y, sz = l.z
+      const step = LASER_SPEED * d
+      l.x += l.dx * step
+      l.y += l.dy * step
+      l.z += l.dz * step
       l.life -= d
-      if (l.life <= 0) l.alive = false
-    }
-
-    for (const l of lasers.current) {
-      if (!l.alive) continue
+      // Swept relative-motion test: fast shots cannot tunnel through small rocks.
+      let victim: Asteroid | null = null
+      let first = Infinity
       for (const a of asteroids.current) {
-        if (!a.alive) continue
-        const dx = l.x - a.x
-        const dy = l.y - a.y
-        const dz = l.z - a.z
-        if (dx * dx + dy * dy + dz * dz < (a.r + HIT_RADIUS) ** 2) {
-          spawnExplosion(a.x, a.y, a.z, a.r)
-          useGame.getState().addVoidScore(VOID_ASTEROID_SCORES[a.tier])
-          a.alive = false
-          l.alive = false
-          break
-        }
+        if (!a.alive || a.birth > 0) continue
+        const dx = l.dx * step - a.vx * d
+        const dy = l.dy * step - a.vy * d
+        const dz = l.dz * step - a.vz * d
+        const ox = sx - (a.x - a.vx * d), oy = sy - (a.y - a.vy * d), oz = sz - (a.z - a.vz * d)
+        const aa = dx * dx + dy * dy + dz * dz
+        const bb = 2 * (ox * dx + oy * dy + oz * dz)
+        const cc = ox * ox + oy * oy + oz * oz - (a.r + HIT_RADIUS) ** 2
+        const disc = bb * bb - 4 * aa * cc
+        if (aa < 1e-10 || disc < 0) continue
+        const entry = cc <= 0 ? 0 : (-bb - Math.sqrt(disc)) / (2 * aa)
+        if (entry >= 0 && entry <= 1 && entry < first) { first = entry; victim = a }
+      }
+      if (victim) {
+        spawnExplosion(victim.x, victim.y, victim.z, victim.r)
+        useGame.getState().addVoidScore(VOID_ASTEROID_SCORES[victim.tier])
+        hits.current++
+        fracture(victim)
+        if (practice) { reportedAt.current = 0.13; practice.onImpact?.() }
+        l.alive = false
+      } else if (l.life <= 0) l.alive = false
+    }
+    if (practice) {
+      reportedAt.current += d
+      if (reportedAt.current > 0.12) {
+        reportedAt.current = 0
+        const stats = { large: 0, medium: 0, small: 0, hits: hits.current }
+        for (const a of asteroids.current) if (a.alive) stats[a.tier]++
+        practice.onStats(stats)
       }
     }
 
@@ -359,8 +454,9 @@ export function VoidCombat({ shipRef }: { shipRef: RefObject<THREE.Group | null>
       for (const e of explosions.current) {
         if (!e.alive) continue
         const t = e.life / EXPLOSION_LIFE
-        const burst = 1 - (1 - t) ** 2
-        const flashScale = e.scale * (0.35 + burst * 2.4)
+        const age = EXPLOSION_LIFE - e.life
+        const flashScale = e.scale * Math.max(0, 1 - age / 0.16) * 0.35
+        if (t <= 0 || flashScale === 0) continue
         dummy.position.set(e.x, e.y, e.z)
         dummy.rotation.set(0, 0, 0)
         dummy.scale.set(flashScale, flashScale, flashScale)
@@ -423,19 +519,20 @@ export function VoidCombat({ shipRef }: { shipRef: RefObject<THREE.Group | null>
       sparkMesh.current.instanceMatrix.needsUpdate = true
     }
 
-    if (astMesh.current) {
+    for (let variant = 0; variant < rockGeometries.length; variant++) {
+      const mesh = astMeshes.current[variant]
+      if (!mesh) continue
       let i = 0
       for (const a of asteroids.current) {
-        if (!a.alive) continue
+        if (!a.alive || a.variant !== variant) continue
         dummy.position.set(a.x, a.y, a.z)
         dummy.rotation.set(a.phase * 0.7, a.phase, a.phase * 1.3)
-        const s = a.r
-        dummy.scale.set(s, s * (0.82 + (a.phase % 1) * 0.2), s * 0.9)
+        dummy.scale.setScalar(a.r)
         dummy.updateMatrix()
-        astMesh.current.setMatrixAt(i++, dummy.matrix)
+        mesh.setMatrixAt(i++, dummy.matrix)
       }
-      astMesh.current.count = i
-      astMesh.current.instanceMatrix.needsUpdate = true
+      mesh.count = i
+      mesh.instanceMatrix.needsUpdate = true
     }
 
     if (laserMesh.current) {
@@ -457,10 +554,11 @@ export function VoidCombat({ shipRef }: { shipRef: RefObject<THREE.Group | null>
 
   return (
     <group>
-      <instancedMesh ref={astMesh} args={[undefined, undefined, MAX_ASTEROIDS]} frustumCulled={false}>
-        <dodecahedronGeometry args={[1, 0]} />
-        <meshStandardMaterial color="#4a4038" metalness={0.35} roughness={0.82} flatShading />
-      </instancedMesh>
+      {rockGeometries.map((geometry, i) => (
+        <instancedMesh key={i} ref={(mesh) => { astMeshes.current[i] = mesh }} args={[geometry, undefined, MAX_ASTEROIDS]} frustumCulled={false}>
+          <meshStandardMaterial vertexColors metalness={0.06} roughness={0.96} flatShading />
+        </instancedMesh>
+      ))}
       <instancedMesh ref={laserMesh} args={[undefined, undefined, MAX_LASERS]} frustumCulled={false}>
         <boxGeometry args={[1, 1, 1]} />
         <meshBasicMaterial color="#7df9ff" toneMapped={false} />
@@ -483,11 +581,11 @@ export function VoidCombat({ shipRef }: { shipRef: RefObject<THREE.Group | null>
         args={[undefined, undefined, MAX_EXPLOSIONS * DEBRIS_PER]}
         frustumCulled={false}
       >
-        <dodecahedronGeometry args={[1, 0]} />
+        <icosahedronGeometry args={[1, 0]} />
         <meshStandardMaterial
           color="#6a5848"
           emissive="#ff6622"
-          emissiveIntensity={0.72}
+          emissiveIntensity={0.22}
           metalness={0.28}
           roughness={0.86}
           flatShading

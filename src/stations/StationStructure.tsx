@@ -34,13 +34,14 @@ function hardware() {
   return { parts, add, box, beam }
 }
 
-function BakedHardware({ parts, color }: { parts: Part[]; color: string }) {
+function BakedHardware({ parts, color, hull = '#a7b5c4' }: { parts: Part[]; color: string; hull?: string }) {
   const batches = useMemo(() => {
     const finishes: Finish[] = ['hull', 'frame', 'solar', 'glass', 'light', 'gold']
     return finishes.flatMap((finish) => {
-      const pieces = parts.filter((p) => p.finish === finish).map((p) => p.geometry)
+      const pieces = parts.filter((p) => p.finish === finish).map((p) => p.geometry.index ? p.geometry.toNonIndexed() : p.geometry)
       if (!pieces.length) return []
-      const geometry = mergeGeometries(pieces, false)!
+      const geometry = mergeGeometries(pieces, false)
+      if (!geometry) throw new Error(`Unable to merge station ${finish} geometry`)
       return [{ finish, geometry }]
     })
   }, [parts])
@@ -52,7 +53,8 @@ function BakedHardware({ parts, color }: { parts: Part[]; color: string }) {
         <meshBasicMaterial color={color} toneMapped={false} />
       ) : (
         <meshStandardMaterial
-          color={{ hull: '#a7b5c4', frame: '#263646', solar: '#132e52', glass: '#83c6d7', gold: '#b99b65' }[finish]}
+          color={{ hull, frame: '#263646', solar: '#132e52', glass: '#83c6d7', gold: '#b99b65' }[finish]}
+          side={THREE.DoubleSide}
           metalness={finish === 'glass' ? 0.3 : finish === 'hull' ? 0.55 : 0.75}
           roughness={finish === 'solar' ? 0.32 : 0.48}
           emissive={finish === 'glass' ? color : '#000000'}
@@ -63,150 +65,226 @@ function BakedHardware({ parts, color }: { parts: Part[]; color: string }) {
   ))}</>
 }
 
-/** Structural habitat wheel with inset windows, armored segments and radial tunnels. */
-function HabitatWheel({ color, radius, tilt, speed }: { color: string; radius: number; tilt: Vec3; speed: number }) {
+type Hardware = ReturnType<typeof hardware>
+const HALF_PI = Math.PI / 2
+
+/** Flush window strips, kept outside the pressure skin. */
+function cabin(h: Hardware, position: Vec3, size: Vec3) {
+  const [x, y, z] = position
+  const [w, height, d] = size
+  h.box('hull', size, position)
+  h.box('frame', [w + 0.04, 0.045, d + 0.04], [x, y - height / 2, z])
+  for (const side of [-1, 1]) {
+    h.box('glass', [w * 0.72, height * 0.22, 0.018], [x, y + height * 0.17, z + side * (d / 2 + 0.012)])
+    h.box('glass', [0.018, height * 0.22, d * 0.6], [x + side * (w / 2 + 0.012), y + height * 0.17, z])
+  }
+}
+
+/** Modular solar sail with raised cells on BOTH faces and a busbar in the cell gap. */
+function sail(h: Hardware, position: Vec3, width: number, height: number) {
+  const [x, y, z] = position
+  h.box('frame', [width, height, 0.045], position)
+  const cols = 4
+  const rows = 8
+  for (const face of [-1, 1]) {
+    for (let i = 0; i < cols; i++) for (let j = 0; j < rows; j++) {
+      h.box('solar', [width / cols - 0.023, height / rows - 0.023, 0.008],
+        [x + (i - (cols - 1) / 2) * width / cols, y + (j - (rows - 1) / 2) * height / rows, z + face * 0.029])
+    }
+    h.box('gold', [0.012, height - 0.04, 0.008], [x, y, z + face * 0.031])
+  }
+  for (const side of [-1, 1]) h.box('light', [0.045, 0.045, 0.015], [x + side * (width / 2 - 0.025), y + height / 2, z])
+}
+
+/** Front-facing pressure tunnel. All facilities reserve z >= .55 for the dock. */
+function dock(h: Hardware) {
+  h.box('hull', [0.34, 0.32, 0.12], [0, -0.24, 0.46])
+  h.add('frame', new THREE.CylinderGeometry(0.19, 0.19, 0.38, 12, 1, true), [0, -0.24, 0.69], [HALF_PI, 0, 0])
+  h.box('frame', [0.31, 0.31, 0.02], [0, -0.24, 0.51])
+  for (const z of [0.57, 0.87]) h.add('hull', new THREE.TorusGeometry(0.2, 0.025, 6, 12), [0, -0.24, z])
+  h.add('light', new THREE.TorusGeometry(0.193, 0.009, 6, 24), [0, -0.24, 0.885])
+  h.box('frame', [0.54, 0.04, 0.5], [0, -0.465, 0.82])
+  h.box('hull', [0.46, 0.015, 0.46], [0, -0.435, 0.82])
+  for (const side of [-1, 1]) {
+    h.beam([side * 0.14, -0.395, 0.45], [side * 0.22, -0.48, 1.04], 0.018)
+    for (let i = 0; i < 3; i++) h.box('light', [0.025, 0.012, 0.06], [side * 0.23, -0.419, 0.65 + i * 0.16])
+  }
+}
+
+/** A shallow parabolic reflector, built on an explicit rim and feed mast. */
+function reflector(h: Hardware, position: Vec3, radius: number) {
+  const [x, y, z] = position
+  const profile = Array.from({ length: 13 }, (_, i) => {
+    const r = radius * i / 12
+    return new THREE.Vector2(r, 0.3 * r * r / radius)
+  })
+  // Lathe's bowl axis is +Y; rotate toward the front (+Z).
+  const bowl = new THREE.LatheGeometry(profile, 40)
+  h.add('hull', bowl, position, [HALF_PI, 0, 0])
+  h.add('frame', new THREE.TorusGeometry(radius, 0.018, 6, 40), [x, y, z + radius * 0.3])
+  for (let i = 0; i < 3; i++) {
+    const a = i * TAU / 3
+    h.beam([x + Math.cos(a) * radius, y + Math.sin(a) * radius, z + radius * 0.3], [x, y, z + radius * 0.8], 0.009)
+  }
+  h.add('gold', new THREE.CylinderGeometry(0.035, 0.035, 0.09, 8), [x, y, z + radius * 0.8], [HALF_PI, 0, 0])
+}
+
+/** VibeMail: a wide communications bus with tall outboard sails and a dish crown. */
+function relay(h: Hardware) {
+  cabin(h, [0, -0.05, 0], [0.58, 0.5, 0.82])
+  h.box('frame', [2.6, 0.13, 0.13], [0, -0.15, -0.35])
+  for (const side of [-1, 1]) {
+    sail(h, [side * 1.04, 0.06, -0.25], 0.64, 1.52)
+    h.beam([side * 0.28, -0.22, -0.35], [side * 0.71, 0.5, -0.35], 0.023)
+    // Courier pods sit in the open gap between the central bus and sails.
+    h.add('hull', new THREE.CapsuleGeometry(0.115, 0.32, 4, 12), [side * 0.49, -0.05, 0.1])
+    h.beam([side * 0.28, -0.05, 0.1], [side * 0.49, -0.05, 0.1], 0.025)
+  }
+  h.beam([0, 0.2, -0.2], [0, 0.76, -0.2], 0.045, 'frame')
+  h.beam([0, 0.76, -0.2], [0, 0.76, -0.081], 0.035)
+  reflector(h, [0, 0.76, -0.08], 0.39)
+}
+
+/** Waypoint: a single horizontal observatory ring, with a fixed hub and spokes. */
+function observatory(h: Hardware) {
+  h.add('hull', new THREE.CylinderGeometry(0.27, 0.32, 0.95, 12), [0, -0.215, 0])
+  h.add('glass', new THREE.SphereGeometry(0.265, 24, 12, 0, TAU, 0, HALF_PI), [0, 0.265, 0])
+  h.add('frame', new THREE.TorusGeometry(0.28, 0.025, 6, 32), [0, 0.265, 0], [HALF_PI, 0, 0])
+  // Bearing is stationary. The rotating outer rim starts at r=.98; this ends at .965.
+  h.add('frame', new THREE.TorusGeometry(0.95, 0.015, 6, 80), [0, -0.72, 0], [HALF_PI, 0, 0])
+  for (let i = 0; i < 6; i++) {
+    const a = i * TAU / 6
+    h.beam([Math.cos(a) * 0.28, -0.72, Math.sin(a) * 0.28], [Math.cos(a) * 0.95, -0.72, Math.sin(a) * 0.95], 0.026, 'hull')
+  }
+  h.box('hull', [0.34, 0.25, 0.22], [0, -0.24, 0.405])
+  // Narrow sensor boom occupies the rear opening, above the ring's swept volume.
+  h.beam([0, 0.02, -0.23], [0, 0.02, -0.85], 0.032)
+  h.beam([0, 0.02, -0.85], [0, 0.88, -0.85], 0.027)
+  h.add('hull', new THREE.OctahedronGeometry(0.15), [0, 0.88, -0.85])
+  h.box('light', [0.03, 0.12, 0.03], [0, 1.08, -0.85])
+}
+
+/** ZTM Music: two large resonator barrels and a stepped equalizer radiator. */
+function soundDock(h: Hardware) {
+  cabin(h, [0, -0.05, 0.03], [0.5, 0.48, 0.74])
+  h.box('frame', [2.1, 0.12, 0.15], [0, -0.08, -0.25])
+  for (const side of [-1, 1]) {
+    const x = side * 0.85
+    h.add('hull', new THREE.CylinderGeometry(0.36, 0.36, 0.65, 20, 1, true), [x, 0, 0], [HALF_PI, 0, 0])
+    h.add('frame', new THREE.CylinderGeometry(0.34, 0.34, 0.04, 20), [x, 0, -0.31], [HALF_PI, 0, 0])
+    for (const z of [-0.32, 0.32]) h.add('gold', new THREE.TorusGeometry(0.365, 0.023, 6, 32), [x, 0, z])
+    // Inset stepped cones are behind the open front rim, never coplanar with it.
+    h.add('frame', new THREE.CylinderGeometry(0.31, 0.13, 0.18, 24, 1, true), [x, 0, 0.2], [HALF_PI, 0, 0])
+    h.add('light', new THREE.TorusGeometry(0.29, 0.012, 6, 32), [x, 0, 0.305])
+    h.add('gold', new THREE.SphereGeometry(0.12, 16, 8), [x, 0, 0.1])
+    h.beam([x, -0.3, -0.25], [x, -0.62, -0.25], 0.03)
+    sail(h, [x, -0.73, -0.25], 0.56, 0.22)
+  }
+  h.box('frame', [1.45, 0.08, 0.11], [0, 0.4, -0.42])
+  for (let i = 0; i < 7; i++) {
+    const height = 0.26 + (3 - Math.abs(i - 3)) * 0.13
+    const x = (i - 3) * 0.2
+    h.box('hull', [0.105, height, 0.1], [x, 0.44 + height / 2, -0.42])
+    h.box('light', [0.06, 0.025, 0.015], [x, 0.44 + height, -0.36])
+  }
+  h.beam([0, 0.16, -0.3], [0, 0.4, -0.42], 0.045)
+}
+
+/** Scoundrel: an open forked salvage gantry, with offset bridge and a crane. */
+function salvage(h: Hardware) {
+  h.box('hull', [2.1, 0.25, 0.34], [0, -0.13, -0.48])
+  cabin(h, [-0.7, 0.18, -0.47], [0.52, 0.35, 0.38])
+  for (const side of [-1, 1]) {
+    const x = side * 0.96
+    h.box('frame', [0.14, 0.17, 1.34], [x, -0.18, 0.31])
+    h.box('frame', [0.045, 0.04, 1.34], [x + side * 0.09, -0.29, 0.31])
+    for (let i = 0; i < 4; i++) {
+      const z = -0.25 + i * 0.34
+      h.box('hull', [0.2, 0.06, 0.18], [x, -0.05, z])
+      h.beam([x + side * 0.09, -0.29, z - 0.1], [x + side * 0.09, -0.09, z + 0.12], 0.018, 'gold')
+    }
+    h.box('light', [0.11, 0.05, 0.04], [x, -0.16, 1])
+  }
+  // Separated salvage bins: .34-wide bins on .46 centers leave .12 clear.
+  for (let i = 0; i < 3; i++) {
+    const x = -0.13 + i * 0.46
+    h.box('gold', [0.34, 0.31, 0.3], [x, 0.15, -0.5])
+    for (const dx of [-0.12, 0.12]) h.box('frame', [0.025, 0.32, 0.32], [x + dx, 0.15, -0.5])
+  }
+  h.beam([-1.03, 0, -0.55], [-1.03, 0.85, -0.55], 0.05, 'gold')
+  h.beam([-1.03, 0.85, -0.55], [-0.25, 1.05, -0.3], 0.05, 'gold')
+  h.beam([-0.25, 1.05, -0.3], [-0.25, 0.61, 0.05], 0.014)
+  h.add('frame', new THREE.TorusGeometry(0.07, 0.018, 6, 12, Math.PI * 1.4), [-0.25, 0.55, 0.05])
+  h.box('hull', [0.45, 0.33, 0.75], [0, -0.23, 0.06])
+}
+
+/** Recipes: three domed cultivation pods, with clear service lanes between them. */
+function greenhouse(h: Hardware) {
+  const spacing = 0.78 // Pod outer diameter .60: .18-wide service lanes.
+  h.box('frame', [2.12, 0.1, 0.13], [0, -0.16, -0.4])
+  for (let i = -1; i <= 1; i++) {
+    const x = i * spacing
+    h.add('hull', new THREE.CylinderGeometry(0.3, 0.26, 0.36, 16), [x, 0, -0.2])
+    h.add('glass', new THREE.SphereGeometry(0.28, 24, 12, 0, TAU, 0, HALF_PI), [x, 0.19, -0.2])
+    h.add('hull', new THREE.TorusGeometry(0.286, 0.016, 6, 32), [x, 0.18, -0.2], [HALF_PI, 0, 0])
+    for (const a of [0, HALF_PI]) {
+      h.add('frame', new THREE.TorusGeometry(0.289, 0.009, 6, 24, Math.PI), [x, 0.19, -0.2], [0, a, 0])
+    }
+    h.beam([x, -0.17, -0.2], [x, -0.47, -0.2], 0.035)
+    h.box('gold', [0.3, 0.14, 0.54], [x, -0.54, -0.2])
+  }
+  // Rear heat exchangers are wholly behind the dome envelopes (z < -.5).
+  for (const x of [-0.5, 0.5]) {
+    h.beam([x, -0.16, -0.4], [x, -0.16, -0.77], 0.025)
+    sail(h, [x, 0.3, -0.8], 0.67, 0.87)
+  }
+  h.box('frame', [0.2, 0.1, 0.2], [0, -0.18, 0.12])
+  h.box('hull', [0.4, 0.28, 0.34], [0, -0.24, 0.34])
+}
+
+/** Only the observatory rim rotates; its spokes, sensor mast, and dock stay fixed. */
+function ObservatoryRim({ color, phase }: { color: string; phase?: number }) {
   const rotor = useRef<THREE.Group>(null)
   const parts = useMemo(() => {
     const h = hardware()
-    h.add('frame', new THREE.TorusGeometry(radius, 0.083, 8, 80))
     for (let i = 0; i < 16; i++) {
-      const a = (i / 16) * TAU
-      const gap = 0.07
-      h.add('hull', new THREE.TorusGeometry(radius, 0.105, 6, 5, TAU / 16 - gap), [0, 0, 0], [0, 0, a + gap / 2])
-      const x = Math.cos(a) * radius
-      const y = Math.sin(a) * radius
-      h.box('frame', [0.2, 0.06, 0.28], [x, y, 0], [0, 0, a])
-      for (const z of [-0.105, 0.105]) {
-        h.box('glass', [0.11, 0.038, 0.025], [x, y, z], [0, 0, a + Math.PI / 2])
-      }
-      if (i % 2 === 1) {
-        h.box('frame', [0.08, 0.12, 0.018], [x, y, 0.112], [0, 0, a])
-        h.box('gold', [0.035, 0.08, 0.02], [x, y, 0.127], [0, 0, a])
-      }
-      if (i % 4 === 0) {
-        h.beam([Math.cos(a) * 0.28, Math.sin(a) * 0.28, 0], [x, y, 0], 0.055, 'hull')
-        h.beam([0, 0, -0.24], [x, y, 0], 0.018)
-        h.box('light', [0.1, 0.04, 0.03], [x, y, 0.15], [0, 0, a])
-      }
+      const a = i * TAU / 16
+      h.add('hull', new THREE.TorusGeometry(1.08, 0.1, 8, 5, TAU / 16 - 0.035), [0, 0, 0], [0, 0, a + 0.0175])
+      h.box('glass', [0.08, 0.028, 0.012], [Math.cos(a) * 1.08, Math.sin(a) * 1.08, 0.107], [0, 0, a])
     }
     return h.parts
-  }, [radius])
+  }, [])
   useFrame((_, delta) => {
-    if (rotor.current && !useGame.getState().reducedMotion) rotor.current.rotation.z += Math.min(delta, 0.05) * speed
+    if (!rotor.current) return
+    if (phase !== undefined) rotor.current.rotation.z = phase
+    else if (!useGame.getState().reducedMotion) rotor.current.rotation.z += Math.min(delta, 0.05) * 0.06
   })
-  return <group rotation={tilt}><group ref={rotor}><BakedHardware parts={parts} color={color} /></group></group>
+  // The complete swept rim stays below y=-.62, clear of the dock and its braces.
+  return <group position={[0, -0.72, 0]} rotation={[HALF_PI, 0, 0]}><group ref={rotor}><BakedHardware parts={parts} color={color} /></group></group>
 }
 
-/** Two rigid solar wings with individual cells, hinges and a braced central spar. */
-function solarWing(h: ReturnType<typeof hardware>, side: number, y: number, z: number, length = 0.64) {
-  h.beam([side * 0.25, y, z], [side * 1.65, y, z], 0.045, 'hull')
-  for (let panel = 0; panel < 2; panel++) {
-    const x = side * (0.94 + panel * 0.5)
-    h.box('frame', [0.46, 0.045, length * 2], [x, y, z])
-    for (let row = 0; row < 8; row++) {
-      for (let col = 0; col < 3; col++) {
-        h.box('solar', [0.125, 0.012, length / 4 - 0.025], [x + (col - 1) * 0.14, y + 0.03, z + (row - 3.5) * length / 4])
-      }
-    }
-    h.box('gold', [0.022, 0.025, length * 2], [x, y + 0.04, z])
-    h.box('light', [0.06, 0.025, 0.025], [x, y + 0.04, z + length])
-  }
-  h.beam([side * 0.3, y - 0.28, z], [side * 1.15, y, z], 0.025)
+const BUILDERS: Record<string, (h: Hardware) => void> = {
+  vibemail: relay,
+  waypoint: observatory,
+  'music-player': soundDock,
+  scoundrel: salvage,
+  recipes: greenhouse,
+}
+const HULLS: Record<string, string> = {
+  vibemail: '#b6c9dc', waypoint: '#a7b8c5', 'music-player': '#918baf', scoundrel: '#8e8674', recipes: '#c6d6bd',
 }
 
-function modulePod(h: ReturnType<typeof hardware>, x: number, y: number, z: number, length: number) {
-  h.add('hull', new THREE.CylinderGeometry(0.17, 0.17, length, 12), [x, y, z], [Math.PI / 2, 0, 0])
-  for (const dz of [-length / 2, 0, length / 2]) {
-    h.add('frame', new THREE.TorusGeometry(0.173, 0.022, 6, 16), [x, y, z + dz])
-  }
-  h.box('glass', [0.18, 0.08, 0.025], [x, y + 0.02, z + length / 2 + 0.008])
-}
-
-export function StationStructure({ id, color, radius }: { id: string; color: string; radius: number }) {
+export function StationStructure({ id, color, radius, phase }: { id: string; color: string; radius: number; phase?: number }) {
   const parts = useMemo(() => {
     const h = hardware()
-    // Faceted pressure vessel, service collars, and a raised command deck.
-    h.add('hull', new THREE.CylinderGeometry(0.34, 0.44, 0.8, 8))
-    for (const y of [-0.38, 0.34]) {
-      h.add('frame', new THREE.CylinderGeometry(0.46, 0.46, 0.07, 8), [0, y, 0])
-    }
-    h.add('hull', new THREE.CylinderGeometry(0.23, 0.32, 0.18, 8), [0, 0.51, 0])
-    for (let i = 0; i < 8; i++) {
-      const a = i * TAU / 8
-      h.box('glass', [0.18, 0.065, 0.02], [Math.sin(a) * 0.284, 0.52, Math.cos(a) * 0.284], [0, a, 0])
-      h.box('frame', [0.05, 0.48, 0.055], [Math.sin(a) * 0.39, -0.02, Math.cos(a) * 0.39], [0, a, 0])
-    }
-    // Service radiators under the pressure hull and paired propellant tanks.
-    for (let i = 0; i < 6; i++) {
-      h.box('frame', [0.46, 0.022, 0.34], [0, -0.48 - i * 0.045, -0.13])
-    }
-    for (const side of [-1, 1]) {
-      h.add('gold', new THREE.CapsuleGeometry(0.085, 0.32, 4, 8), [side * 0.3, -0.25, -0.35])
-      h.beam([side * 0.3, -0.44, -0.35], [side * 0.3, 0.02, -0.35], 0.018)
-    }
-    // A real recessed airlock: a dark back wall, deep tunnel, nested collars.
-    h.add('frame', new THREE.CylinderGeometry(0.23, 0.23, 0.42, 12, 1, true), [0, -0.19, 0.52], [Math.PI / 2, 0, 0])
-    h.box('frame', [0.36, 0.36, 0.03], [0, -0.19, 0.34])
-    for (const z of [0.42, 0.64, 0.74]) {
-      h.add(z === 0.64 ? 'light' : 'hull', new THREE.TorusGeometry(0.24, z === 0.64 ? 0.013 : 0.035, 6, 12), [0, -0.19, z])
-    }
-    // Cantilever docking apron, braces, rails, and paired approach lights.
-    h.box('frame', [0.64, 0.07, 0.6], [0, -0.46, 0.8])
-    h.box('hull', [0.48, 0.018, 0.58], [0, -0.416, 0.8])
-    for (const side of [-1, 1]) {
-      h.beam([side * 0.28, -0.6, 0.15], [side * 0.28, -0.48, 1.06], 0.025)
-      h.beam([side * 0.3, -0.31, 0.52], [side * 0.3, -0.31, 1.05], 0.015)
-      for (let i = 0; i < 4; i++) {
-        h.box('light', [0.026, 0.015, 0.065], [side * 0.265, -0.408, 0.58 + i * 0.14])
-      }
-    }
-    if (id === 'vibemail') {
-      solarWing(h, -1, -0.12, -0.2)
-      solarWing(h, 1, -0.12, -0.2)
-      h.beam([0, 0.5, 0], [0, 1.03, 0], 0.06, 'hull')
-      modulePod(h, -0.48, -0.27, 0, 0.68)
-      modulePod(h, 0.48, -0.27, 0, 0.68)
-    } else if (id === 'waypoint') {
-      solarWing(h, -1, 0, -0.48, 0.48)
-      solarWing(h, 1, 0, -0.48, 0.48)
-      h.beam([0, 0.48, 0], [0, 1.18, 0], 0.038, 'hull')
-      for (const side of [-1, 1]) {
-        h.beam([side * 0.35, 0.15, 0], [0, 0.95, 0], 0.022)
-      }
-    } else if (id === 'music-player') {
-      for (const side of [-1, 1]) {
-        h.beam([0, 0, 0], [side * 0.8, 0, 0], 0.09, 'hull')
-        modulePod(h, side * 0.8, 0, 0, 0.86)
-        for (const y of [-0.21, 0.21]) {
-          h.add('hull', new THREE.TorusGeometry(0.15, 0.028, 6, 24), [side * 0.8, y, 0.47])
-          h.add('light', new THREE.TorusGeometry(0.11, 0.01, 6, 24), [side * 0.8, y, 0.48])
-        }
-      }
-      solarWing(h, -1, -0.38, -0.45, 0.4)
-      solarWing(h, 1, -0.38, -0.45, 0.4)
-    } else if (id === 'scoundrel') {
-      solarWing(h, -1, 0.18, -0.35, 0.72)
-      h.beam([0.3, -0.15, 0], [1.22, -0.15, 0], 0.055, 'hull')
-      for (let i = 0; i < 3; i++) {
-        modulePod(h, 0.6 + i * 0.27, -0.24, -0.08, 0.52 + i * 0.13)
-      }
-      h.beam([-0.3, 0.3, 0], [-0.7, 0.9, 0], 0.035)
-    } else {
-      for (const side of [-1, 1]) {
-        h.beam([0, 0, 0], [side * 0.88, 0, 0], 0.065, 'hull')
-        for (let i = 0; i < 3; i++) modulePod(h, side * (0.51 + i * 0.27), 0, -0.08, 0.8)
-      }
-      solarWing(h, -1, -0.38, -0.5, 0.42)
-      solarWing(h, 1, -0.38, -0.5, 0.42)
-    }
+    ;(BUILDERS[id] ?? relay)(h)
+    dock(h)
     return h.parts
   }, [id])
-  const tilt: Vec3 = id === 'waypoint' ? [0.35, 0.45, 0] : id === 'scoundrel' ? [0.5, -0.25, 0.2] : [Math.PI / 2.7, 0, 0]
   return (
     <group scale={radius}>
-      <BakedHardware parts={parts} color={color} />
-      <HabitatWheel color={color} radius={id === 'music-player' ? 1.24 : 1.08} tilt={id === 'music-player' ? [0, 0, 0] : tilt} speed={id === 'scoundrel' ? -0.035 : 0.045} />
-      {id === 'waypoint' && <HabitatWheel color={color} radius={1.28} tilt={[-0.65, -0.5, 0]} speed={-0.03} />}
+      <BakedHardware parts={parts} color={color} hull={HULLS[id]} />
+      {id === 'waypoint' && <ObservatoryRim color={color} phase={phase} />}
     </group>
   )
 }

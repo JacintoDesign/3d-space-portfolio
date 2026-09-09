@@ -8,9 +8,10 @@ An immersive, **3D playable portfolio** for a one-person studio. Pilot a fighter
 - **Shareable + resilient** → **deep-links** (`/#recipes` opens that project on load; the URL tracks what you're viewing), a rich **social share card** (`og.jpg`), and a graceful **static fallback** (a full mini-portfolio) if WebGL is unavailable — never a blank screen
 - **Photo mode** (`P`) → hides all HUD/nav chrome; drag to frame and screenshot. Respects **reduced-motion** (calms the auto-orbit + warp flash) and buzzes light **haptics** on dock/transit (mobile)
 - **Arcade flight** → auto-leveling, banking ship with an **attitude limiter**: the nose soft-stops short of vertical and eases back to the horizon (HUD shows "ATTITUDE ASSIST"), so the ship can never flip onto its back; hitting the sector edge engages an **autopilot to the nearest unvisited station**, so the boundary always aims you at content
-- **Stations** → 5 distinct procedural facilities: a twin-wing mail relay, a dual-ring survey station, an upright sound dock, an asymmetric salvage outpost, and a clustered supply depot. Segmented rotating habitat wheels, radial tunnels, faceted command decks, inset windows, individual solar cells, service radiators, propellant tanks, and recessed docking collars give each a connected industrial silhouette. Repeated hardware is merged by material to keep draw calls low.
-- **Station readouts** → camera-facing Japanese blade signs and overhead project holograms stay clear of the hull from every approach. Arrival framing fits the full station on portrait screens; habitat rotation, satellites, and hologram motion respect reduced-motion preferences.
+- **Stations** → five different architectures: VibeMail's tall solar sails and parabolic communications dish; Waypoint's observatory on a rotating lower rim; ZTM Music's twin resonators and stepped radiator; Scoundrel's open salvage gantry and crane; and Recipes' three greenhouse domes. Stationary hardware is kept outside the observatory rim's swept volume, with fixed spokes and a separate bearing. Cargo bins and cultivation pods have clear service gaps. Repeated hardware is merged by material to keep draw calls low.
+- **Station readouts** → camera-facing Japanese blade signs and overhead project holograms stay clear of the hull from every approach. Arrival framing fits the full station on portrait screens; observatory rotation, satellites, and hologram motion respect reduced-motion preferences.
 - **Moon** → a big **procedural shader moon** (fbm maria + cratering, a lit crescent, nebula-tinted limb) hangs in the midground beyond the gate for depth — no texture files
+- **Asteroid belt** → drop out of warp with `B`, then hold `Space` (or FIRE on mobile) to shoot. Three cratered rock shapes tumble without changing size. Large rocks split into three medium chunks; medium rocks split into two small chunks; small rocks become debris. Fragments inherit momentum, remain shootable, and award 100 / 50 / 10 points by size. Swept collision checks catch fast shots between frames, and short impact flashes keep the fragments visible.
 - **The Gateway** → a colossal greebled jump-ring with a **dark, shimmering portal membrane**. Fly through it and the ship warps into **the void** — true-black space beyond the nebula, a fast warp corridor under a vast field of small distant stars — and back again. Autopilot to any project from the void and it routes you home through the gateway automatically
 - **About / Contact** → not stations: **warp cinematics out in the void** — the ship jumps beyond the portal and a slow camera **orbits it** (level → high, near-top-down) while it hangs in the text-free half of the frame and the studio story (left) or the comms form (right) plays over the view. Closing it **autopilots you home through the gateway** back to a project
 - **Click to travel** → click any station and the autopilot flies you straight there; leaving the void it teleports to the gateway and **warps home through the portal to the project in seconds**
@@ -53,8 +54,8 @@ No physics engine — arcade flight, proximity docking, and station collision ar
 
 - **Ship** — "Spitfire", [Ultimate Spaceships Pack](https://quaternius.com) by **Quaternius** (CC0)
 - **Stations** — procedural geometry authored in `src/stations/StationStructure.tsx`. The original bundled `station.glb`, retained as an unused source asset, is "Wikiplanet Space Station" by **Alan Zimmerman** via [poly.pizza](https://poly.pizza) (CC-BY)
-- **Comms dish / satellite** — **Poly by Google** via poly.pizza (CC-BY)
-- **Cargo depot** — unused bundled source asset by **Kay Lousberg** via poly.pizza (CC0). Unused station and cargo GLBs are not preloaded.
+- **Satellite** — **Poly by Google** via poly.pizza (CC-BY). The original bundled comms dish is retained as an unused source asset; the relay now uses a procedural reflector.
+- **Cargo depot** — unused bundled source asset by **Kay Lousberg** via poly.pizza (CC0). Unused station, dish, and cargo GLBs are not preloaded.
 
 ## Develop
 
@@ -75,3 +76,10 @@ Deploy `dist/` to any static host (Vercel config included in `vercel.json`).
 - **Station modeling** — hulls, solar arrays, and habitat wheels in `src/stations/StationStructure.tsx`; mounted props, interaction, and hologram placement in `src/stations/Station.tsx`
 - **Screenshots** — `public/images/<name>.jpg`, referenced from `projects.ts` (overlay hero + holo screen)
 - **Demo clips** — drop `public/videos/<id>.mp4` (matches a project `id`) to replace the screenshot / procedural screen
+
+### Development inspection
+
+- `http://localhost:5173/?station-lab` — inspect the actual station assemblies from seven angles, orbit freely, and advance or animate the observatory rim.
+- `http://localhost:5173/?combat-lab` — fire real projectiles at a controlled target, inspect each fragmentation stage and score, or test a small target with 50 ms simulation steps.
+
+These inspection screens are development-only and excluded from the production build.

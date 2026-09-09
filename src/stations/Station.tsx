@@ -11,17 +11,6 @@ import { StationSign } from './StationSign'
 import { HoloScreen } from './HoloScreen'
 import { StationStructure } from './StationStructure'
 
-/** A modest, mounted dish preserves the original prop's attribution and detail. */
-function Uplink({ id, radius }: { id: string; radius: number }) {
-  const dish = useFittedModel(MODEL_URLS.dish, radius * (id === 'waypoint' ? 0.55 : 0.62))
-  const rogue = id === 'scoundrel'
-  return (
-    <group position={rogue ? [-radius * 0.7, radius * 0.96, 0] : [0, radius * 1.08, 0]} rotation={[-0.35, rogue ? -0.6 : 0.5, 0]}>
-      <primitive object={dish} />
-    </group>
-  )
-}
-
 function SurveySatellite({ radius, phase = 0 }: { radius: number; phase?: number }) {
   const orbit = useRef<THREE.Group>(null)
   const model = useFittedModel(MODEL_URLS.satellite, radius * 0.24)
@@ -74,12 +63,11 @@ export function Station({ landmark }: { landmark: Landmark }) {
         <meshBasicMaterial transparent opacity={0} depthWrite={false} />
       </mesh>
       <StationStructure id={landmark.refId ?? landmark.id} radius={R} color={color} />
-      {['vibemail', 'waypoint', 'scoundrel'].includes(landmark.id) && <Uplink id={landmark.id} radius={R} />}
       {landmark.id === 'waypoint' && <>
         <SurveySatellite radius={R} />
         <SurveySatellite radius={R} phase={Math.PI} />
       </>}
-      <mesh ref={halo} rotation={[Math.PI / 2, 0, 0]} position={[0, -R * 0.55, 0]}>
+      <mesh ref={halo} rotation={[Math.PI / 2, 0, 0]} position={[0, -R * 1.05, 0]}>
         <torusGeometry args={[R * 1.3, 0.025, 6, 80]} />
         <meshBasicMaterial color={color} toneMapped={false} transparent opacity={0} depthWrite={false} />
       </mesh>
