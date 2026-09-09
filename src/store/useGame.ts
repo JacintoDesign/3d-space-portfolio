@@ -97,6 +97,7 @@ interface GameState {
   setNearTarget: (id: string | null) => void
   setAutopilot: (id: string | null) => void
   setParked: (id: string | null) => void
+  resumeFlight: () => void
   openOverlay: (id: string) => void
   closeOverlay: () => void
   openAbout: () => void
@@ -152,6 +153,8 @@ export const useGame = create<GameState>((set, get) => ({
     set({ autopilot: id })
   },
 
+  resumeFlight: () => set({ parked: null, autopilot: null }),
+
   setParked: (id) => {
     if (get().parked !== id) set({ parked: id })
   },
@@ -163,7 +166,7 @@ export const useGame = create<GameState>((set, get) => ({
       mode: 'overlay',
       activeBuilding: id,
       autopilot: null,
-      parked: null,
+      parked: s.parked === id ? id : null,
       visited: s.visited.includes(id) ? s.visited : [...s.visited, id],
     }))
   },

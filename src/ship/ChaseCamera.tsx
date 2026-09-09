@@ -80,7 +80,7 @@ export function ChaseCamera({ targetRef }: { targetRef: RefObject<THREE.Group | 
     const m = g.mode
     const reduced = g.reducedMotion
     const cinematic = m === 'about' || m === 'contact'
-    const parkedLm = m === 'play' && g.parked ? landmarkById(g.parked) : null
+    const parkedLm = (m === 'play' || m === 'overlay') && g.parked ? landmarkById(g.parked) : null
 
     if (g.homeTick !== homeTick.current) {
       homeTick.current = g.homeTick

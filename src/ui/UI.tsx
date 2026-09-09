@@ -60,6 +60,7 @@ function TopBar({ onHelp }: { onHelp: () => void }) {
 
 export function UI() {
   const mode = useGame((s) => s.mode)
+  const parked = useGame((s) => s.parked)
   const photoMode = useGame((s) => s.photoMode)
   const controlsSeen = useGame((s) => s.controlsSeen)
   const dismissControls = useGame((s) => s.dismissControls)
@@ -76,7 +77,7 @@ export function UI() {
   }
 
   return (
-    <div className="ui-layer">
+    <div className={`ui-layer${parked || mode !== 'play' ? ' reading' : ''}`}>
       {mode === 'loading' && <Loader />}
 
       {mode !== 'loading' && (

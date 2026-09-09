@@ -115,9 +115,10 @@ export default function App() {
         else if (g.mode === 'overlay') g.closeOverlay()
         else if (g.mode === 'about') g.closeAbout()
         else if (g.mode === 'contact') g.closeContact()
+        else if (g.mode === 'play' && g.parked) g.resumeFlight()
       } else if (e.code === 'KeyP' && !typing && (g.mode === 'play' || g.photoMode)) {
         g.togglePhotoMode()
-      } else if ((e.code === 'KeyE' || e.code === 'Enter') && g.mode === 'play' && g.nearTarget) {
+      } else if ((e.code === 'KeyE' || (e.code === 'Enter' && !(document.activeElement instanceof HTMLButtonElement) && !(document.activeElement instanceof HTMLAnchorElement))) && g.mode === 'play' && g.nearTarget) {
         g.openOverlay(g.nearTarget)
       } else if (e.code === 'KeyB' && g.mode === 'play' && g.zone === 'void' && g.voidWarp) {
         g.dropOutOfWarp()

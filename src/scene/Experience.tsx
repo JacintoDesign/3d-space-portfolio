@@ -24,10 +24,9 @@ export function Experience() {
   return (
     <KeyboardControls map={keyboardMap}>
       <Canvas
-        shadows
-        dpr={[1, isMobile ? 1.3 : 2]}
+        dpr={[1, isMobile ? 1.25 : 1.5]}
         gl={{
-          antialias: true,
+          antialias: false,
           powerPreference: 'high-performance',
           // Keep the drawing buffer so photo-mode shots (and the OG capture) can
           // be saved / read back from the canvas.
