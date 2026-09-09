@@ -1,4 +1,4 @@
-import { StrictMode } from 'react'
+import { lazy, Suspense, StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 // Bundled fonts: JetBrains Mono drives all Latin type (UI, HUD, neon signage);
 // Noto Sans JP gives us authentic kana/kanji on the station blade-signs.
@@ -20,8 +20,14 @@ if (typeof document !== 'undefined' && document.fonts) {
   ])
 }
 
+const InspectionLab = import.meta.env.DEV && new URLSearchParams(window.location.search).has('station-lab')
+  ? lazy(() => import('./dev/StationLab'))
+  : import.meta.env.DEV && new URLSearchParams(window.location.search).has('combat-lab')
+    ? lazy(() => import('./dev/CombatLab'))
+    : null
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <App />
+    {InspectionLab ? <Suspense fallback={null}><InspectionLab /></Suspense> : <App />}
   </StrictMode>,
 )

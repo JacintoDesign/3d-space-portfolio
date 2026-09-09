@@ -8,7 +8,6 @@ import { useGLTF } from '@react-three/drei'
  */
 export const MODEL_URLS = {
   ship: asset('models/ship.glb'),
-  dish: asset('models/dish.glb'),
   satellite: asset('models/satellite.glb'),
 }
 
