@@ -31,7 +31,7 @@ export function Station({ landmark }: { landmark: Landmark }) {
   const R = landmark.radius
   const color = landmark.color
   const halo = useRef<THREE.Mesh>(null)
-  const active = useGame((s) => s.nearTarget === landmark.id)
+  const active = useGame((s) => s.mode === 'play' && s.nearTarget === landmark.id)
   const content = useMemo(() => {
     const project = landmark.refId ? projectById(landmark.refId) : undefined
     return { label: project?.sign ?? landmark.sign, subtitle: project?.tagline ?? '', video: project?.video, image: project?.image }

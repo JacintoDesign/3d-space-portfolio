@@ -23,6 +23,7 @@ function isSteerExcluded(target: EventTarget | null): boolean {
 export function MobileControls() {
   const isMobile = useGame((s) => s.isMobile)
   const mode = useGame((s) => s.mode)
+  const parked = useGame((s) => s.parked)
   const zone = useGame((s) => s.zone)
   const voidWarp = useGame((s) => s.voidWarp)
   const setSteer = useInput((s) => s.setSteer)
@@ -70,9 +71,13 @@ export function MobileControls() {
     }
   }
 
+  useEffect(() => {
+    if (parked || mode !== 'play') useInput.getState().reset()
+  }, [parked, mode])
+
   // Touch-hold steering: offset from screen centre → yaw/pitch, magnitude ∝ distance.
   useEffect(() => {
-    if (!isMobile || mode !== 'play') return
+    if (!isMobile || mode !== 'play' || parked) return
 
     const markSteerIntent = (clientX: number, clientY: number) => {
       if (pointerSteer.moved) return
@@ -145,9 +150,9 @@ export function MobileControls() {
       window.removeEventListener('pointercancel', onUp)
       setSteer(0, 0)
     }
-  }, [isMobile, mode, setSteer, setMobileAimLock, clearMobileAimLock])
+  }, [isMobile, mode, parked, setSteer, setMobileAimLock, clearMobileAimLock])
 
-  if (!isMobile || mode !== 'play') return null
+  if (!isMobile || mode !== 'play' || parked) return null
 
   return (
     <div className="mobile-controls">

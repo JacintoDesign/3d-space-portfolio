@@ -13,6 +13,8 @@ export function Hud() {
   const voidWarp = useGame((s) => s.voidWarp)
   const voidScore = useGame((s) => s.voidScore)
   const dropOutOfWarp = useGame((s) => s.dropOutOfWarp)
+  const parked = useGame((s) => s.parked)
+  const resumeFlight = useGame((s) => s.resumeFlight)
   const autopilot = useGame((s) => s.autopilot)
   const setAutopilot = useGame((s) => s.setAutopilot)
   const throttle = useShip((s) => s.throttle)
@@ -38,6 +40,13 @@ export function Hud() {
 
   return (
     <div className="hud" style={{ '--hud': accent } as CSSProperties}>
+      {parked && (
+        <button className="ap-chip parked-chip" onClick={resumeFlight}>
+          <span className="ap-tag">◎ STATION HOLD</span>
+          <span>Return to free roam</span>
+          <span className="ap-cancel">ESC</span>
+        </button>
+      )}
       {/* center targeting reticle */}
       <div className={`reticle${target ? ' locked' : ''}`}>
         <span className="b tl" />

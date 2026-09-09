@@ -1,6 +1,5 @@
 import { useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
-import { Billboard } from '@react-three/drei'
 import * as THREE from 'three'
 import { useGame } from '../store/useGame'
 import { ProjectScreen } from '../buildings/ProjectScreen'
@@ -20,7 +19,7 @@ interface HoloScreenProps {
 }
 
 /**
- * Scanline + rolling-refresh hologram treatment, laid over the screen content.
+ * Subtle static scanlines and a slow refresh band over stable screen content.
  * Normal blending with soft edges so the projection reads as light, not glass.
  */
 const HOLO_VERT = /* glsl */ `
@@ -36,13 +35,13 @@ const HOLO_FRAG = /* glsl */ `
   varying vec2 vUv;
   void main() {
     // fine scanlines
-    float scan = 0.5 + 0.5 * sin(vUv.y * 240.0 + uTime * 6.0);
+    float scan = 0.5 + 0.5 * sin(vUv.y * 100.0);
     // slow rolling refresh band sweeping upward
     float roll = 1.0 - smoothstep(0.0, 0.22, abs(fract(vUv.y * 0.5 + uTime * 0.07) - 0.5));
     // soft rectangular falloff so the projection has no hard border
     float edge = smoothstep(0.0, 0.05, vUv.x) * smoothstep(1.0, 0.95, vUv.x) *
                  smoothstep(0.0, 0.07, vUv.y) * smoothstep(1.0, 0.93, vUv.y);
-    float a = (scan * 0.10 + roll * 0.16) * edge;
+    float a = (scan * 0.025 + roll * 0.025) * edge;
     gl_FragColor = vec4(uColor, a);
   }
 `
@@ -67,7 +66,7 @@ function Bracket({ x, y, sx, sy, color }: { x: number; y: number; sx: number; sy
 
 /**
  * Station holo projection — an emitter node casts a frameless light-screen
- * bracketed by HUD corner ticks, wrapped in two counter-rotating orbital arcs.
+ * bracketed by HUD corner ticks, wrapped in two counter-rotating orbital arcs. The content itself stays still.
  * Shows a real demo clip when /videos/<id>.mp4 exists, else the procedural
  * animated screen; both get the scanline/refresh hologram treatment.
  */
@@ -86,7 +85,6 @@ export function HoloScreen({
   const tex = videoTex ?? imageTex
   const root = useRef<THREE.Group>(null)
   const basePos = useMemo(() => new THREE.Vector3(...position), [position])
-  const panel = useRef<THREE.Group>(null)
   const arcA = useRef<THREE.Mesh>(null)
   const arcB = useRef<THREE.Mesh>(null)
   const emitter = useRef<THREE.Mesh>(null)
@@ -126,12 +124,6 @@ export function HoloScreen({
       root.current.position.y += (ty - root.current.position.y) * k
       root.current.position.z += (tz - root.current.position.z) * k
     }
-    if (panel.current && !reduced) {
-      panel.current.position.y = Math.sin(t.current * 1.2) * 0.08
-      // occasional hologram stutter
-      const glitch = Math.sin(t.current * 23.0) > 0.985 ? 0.94 : 1
-      panel.current.scale.setScalar((0.985 + Math.sin(t.current * 9) * 0.012) * glitch)
-    }
     if (arcA.current && !reduced) arcA.current.rotation.z += delta * 0.5
     if (arcB.current && !reduced) arcB.current.rotation.z -= delta * 0.32
     if (emitter.current && !reduced) {
@@ -143,20 +135,19 @@ export function HoloScreen({
 
   return (
     <group position={position} ref={root}>
-      <Billboard>
-        <group ref={panel}>
+      <group>
           {/* screen content */}
           {tex ? (
             <mesh>
               <planeGeometry args={size} />
-              <meshBasicMaterial map={tex} color="#9ba9bb" toneMapped={false} transparent opacity={0.92} />
+              <meshBasicMaterial map={tex} color="#d4dce8" toneMapped={false} />
             </mesh>
           ) : (
             <ProjectScreen label={label} subtitle={subtitle} color={color} size={size} active={active} />
           )}
 
           {/* hologram scan treatment over the content */}
-          <mesh position={[0, 0, 0.012]} material={holoMat}>
+          <mesh position={[0, 0, 0.02]} material={holoMat} renderOrder={1}>
             <planeGeometry args={[w, h]} />
           </mesh>
 
@@ -208,8 +199,7 @@ export function HoloScreen({
               />
             </mesh>
           </group>
-        </group>
-      </Billboard>
+      </group>
     </group>
   )
 }

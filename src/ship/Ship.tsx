@@ -111,7 +111,7 @@ export function Ship({ groupRef }: { groupRef: RefObject<THREE.Group | null> }) 
   const telAcc = useRef(0)
   const time = useRef(0)
   const dockLatch = useRef<string | null>(null) // station just closed; blocks re-dock until out of range
-  const hover = useRef(false) // parked by the autopilot in front of a station; any input releases
+  const hover = useRef(false) // parked by autopilot; explicit free-roam action releases
   const parkedLm = useRef<string | null>(null) // which station we're hover-parked at (framing camera)
   const warpUntil = useRef(0) // portal transit: forced-warp window end (sim time)
   const prevPortalDz = useRef<number | null>(null) // signed distance to the portal plane last frame
@@ -244,7 +244,7 @@ export function Ship({ groupRef }: { groupRef: RefObject<THREE.Group | null> }) 
     prevMobileAimLock.current = input.mobileAimLock
 
     const mobileActionFlight =
-      mobile && playing && input.mobileAimLock && (input.thrust || input.boost)
+      mobile && playing && !hover.current && input.mobileAimLock && (input.thrust || input.boost)
 
     // Kill void warp the instant we re-enter the nebula — no lingering streaks.
     if (inNebula && prevZone.current === 'void') {
@@ -258,8 +258,8 @@ export function Ship({ groupRef }: { groupRef: RefObject<THREE.Group | null> }) 
       apRouted.current = null
     }
 
-    // Hover only lives while flying free; leaving play (overlay/cinematic) drops it.
-    if (!playing) hover.current = false
+    // Keep station hold through its docking card; cinematics release it.
+    if (!playing && game.mode !== 'overlay') hover.current = false
 
     // --- entering an About/Contact cinematic: warp out to the void. The store
     //     already flipped zone→void + fired the flash; jump the ship to the
@@ -305,17 +305,8 @@ export function Ship({ groupRef }: { groupRef: RefObject<THREE.Group | null> }) 
     sy = THREE.MathUtils.clamp(sy, -1, 1)
     if (cinematic) bankIntent = sx
 
-    // --- hover: parked in front of a station by the autopilot. Any throttle
-    //     key / mobile button hands back the engines. ---
-    if (
-      hover.current &&
-      (keys.accelerate ||
-        keys.brake ||
-        keys.boost ||
-        (mobile && (input.thrust || input.boost || input.brake)))
-    ) {
-      hover.current = false
-    }
+    // Only the explicit free-roam action releases the parked navigation lock.
+    if (hover.current && !game.parked) hover.current = false
 
     // --- autopilot: deliberate input hands the stick back ---
     let apId = playing ? game.autopilot : null
@@ -506,7 +497,7 @@ export function Ship({ groupRef }: { groupRef: RefObject<THREE.Group | null> }) 
     // --- throttle: no thrust unless applied. Hold W / mobile THRUST to cruise,
     //     Shift / BOOST to boost, S / BRAKE to stop; release thrust and the ship
     //     decelerates to zero — no idle drift. ---
-    const boostK = playing && (keys.boost || input.boost)
+    const boostK = playing && !hover.current && (keys.boost || input.boost)
     const braking = playing && (keys.brake || input.brake)
     const wantThrust = playing && (keys.accelerate || input.thrust)
     let targetSpeed: number
@@ -532,7 +523,7 @@ export function Ship({ groupRef }: { groupRef: RefObject<THREE.Group | null> }) 
     if (freeFlight && targetSpeed === 0 && speed.current < STOP_EPS) speed.current = 0
 
     // --- orientation: mouse drag, cursor aim, then keyboard yaw/pitch ---
-    if (playing && !mobile) {
+    if (playing && !mobile && !hover.current) {
       if (mouseYaw !== 0) {
         qTmp.setFromAxisAngle(WORLD_UP, -mouseYaw)
         group.quaternion.premultiply(qTmp)
@@ -677,7 +668,7 @@ export function Ship({ groupRef }: { groupRef: RefObject<THREE.Group | null> }) 
     if (playing) useGame.getState().setNearTarget(nearestId)
 
     // Publish the parked station so the chase camera can frame it dead-centre.
-    const wantParked = playing && hover.current ? parkedLm.current : null
+    const wantParked = (playing || game.mode === 'overlay') && hover.current ? parkedLm.current : null
     if (game.parked !== wantParked) useGame.getState().setParked(wantParked)
 
     // --- auto-dock: aim at an in-range station (or fly right up to one) and
