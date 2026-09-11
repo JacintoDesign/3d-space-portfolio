@@ -1,7 +1,22 @@
-import type { CSSProperties } from 'react'
-import { useGame } from '../store/useGame'
+import { useEffect, useState, type CSSProperties } from 'react'
+import { formatVoidClock, useGame, voidRemainingMs } from '../store/useGame'
 import { useShip } from '../store/useShip'
 import { landmarkById } from '../data/world'
+
+function useVoidClock(active: boolean, startedAt: number | null) {
+  const [now, setNow] = useState(() => performance.now())
+  useEffect(() => {
+    if (!active || startedAt == null) return
+    let raf = 0
+    const tick = () => {
+      setNow(performance.now())
+      raf = requestAnimationFrame(tick)
+    }
+    raf = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(raf)
+  }, [active, startedAt])
+  return voidRemainingMs(startedAt, now)
+}
 
 /**
  * Cockpit flight HUD — targeting reticle, dock-lock readout, and a throttle /
@@ -12,6 +27,8 @@ export function Hud() {
   const zone = useGame((s) => s.zone)
   const voidWarp = useGame((s) => s.voidWarp)
   const voidScore = useGame((s) => s.voidScore)
+  const voidRound = useGame((s) => s.voidRound)
+  const voidRoundStartedAt = useGame((s) => s.voidRoundStartedAt)
   const dropOutOfWarp = useGame((s) => s.dropOutOfWarp)
   const parked = useGame((s) => s.parked)
   const resumeFlight = useGame((s) => s.resumeFlight)
@@ -26,6 +43,8 @@ export function Hud() {
   const px = useShip((s) => s.px)
   const py = useShip((s) => s.py)
   const pz = useShip((s) => s.pz)
+
+  const remaining = useVoidClock(voidRound === 'active', voidRoundStartedAt)
 
   if (mode !== 'play') return null
 
@@ -118,10 +137,13 @@ export function Hud() {
           <div className="vel">VEL {Math.round(speed)} u/s</div>
         </div>
 
-        {zone === 'void' && !voidWarp && (
+        {zone === 'void' && !voidWarp && voidRound !== 'over' && (
           <div className="void-score">
             <span className="tag">◈ SCORE</span>
             <span className="value">{voidScore.toLocaleString()}</span>
+            {voidRound === 'active' && (
+              <span className={`clock${remaining <= 10_000 ? ' low' : ''}`}>{formatVoidClock(remaining)}</span>
+            )}
           </div>
         )}
       </div>

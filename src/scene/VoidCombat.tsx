@@ -3,7 +3,7 @@ import { useFrame, useThree } from '@react-three/fiber'
 import { useKeyboardControls } from '@react-three/drei'
 import * as THREE from 'three'
 import type { Controls } from '../ship/keyboardMap'
-import { useGame, VOID_ASTEROID_SCORES, type AsteroidSizeTier } from '../store/useGame'
+import { useGame, VOID_ASTEROID_SCORES, voidRemainingMs, type AsteroidSizeTier } from '../store/useGame'
 import { createAsteroidGeometry } from './asteroidGeometry'
 import { useInput } from '../store/useInput'
 
@@ -145,6 +145,8 @@ export function VoidCombat({ shipRef, practice }: {
 }) {
   const isVoid = useGame((s) => s.zone === 'void')
   const voidWarp = useGame((s) => s.voidWarp)
+  const voidRound = useGame((s) => s.voidRound)
+  const voidRoundTick = useGame((s) => s.voidRoundTick)
   const playing = useGame((s) => s.mode === 'play')
   const [, getKeys] = useKeyboardControls<Controls>()
   const camera = useThree((s) => s.camera)
@@ -200,6 +202,7 @@ export function VoidCombat({ shipRef, practice }: {
   const fireCooldown = useRef(0)
   const fireSide = useRef(0)
   const beltSeeded = useRef(false)
+  const lastRoundTick = useRef(voidRoundTick)
   const fwd = useMemo(() => new THREE.Vector3(), [])
   const right = useMemo(() => new THREE.Vector3(), [])
   const spawnPos = useMemo(() => new THREE.Vector3(), [])
@@ -341,6 +344,7 @@ export function VoidCombat({ shipRef, practice }: {
   useFrame((_, delta) => {
     const ship = shipRef.current
     const inBelt = isVoid && playing && ship && !voidWarp
+    const frozen = !practice && voidRound === 'over'
     for (const mesh of astMeshes.current) if (mesh) mesh.visible = Boolean(inBelt)
     if (laserMesh.current) laserMesh.current.visible = Boolean(inBelt)
     if (flashMesh.current) flashMesh.current.visible = Boolean(inBelt)
@@ -355,7 +359,16 @@ export function VoidCombat({ shipRef, practice }: {
       spawnAcc.current = 0
       beltSeeded.current = false
     }
-    if (inBelt && !beltSeeded.current && ship) {
+    if (voidRoundTick !== lastRoundTick.current) {
+      lastRoundTick.current = voidRoundTick
+      for (const a of asteroids.current) a.alive = false
+      for (const l of lasers.current) l.alive = false
+      for (const e of explosions.current) e.alive = false
+      fireCooldown.current = 0
+      spawnAcc.current = 0
+      beltSeeded.current = false
+    }
+    if (inBelt && !beltSeeded.current && ship && !frozen) {
       seedBelt(ship)
       beltSeeded.current = true
     }
@@ -367,15 +380,22 @@ export function VoidCombat({ shipRef, practice }: {
       return
     }
 
-    const d = practice?.paused ? 0 : practice?.coarseStep ? 0.05 : Math.min(delta, 0.05)
-    if (!practice) spawnAcc.current += d
+    if (!practice) {
+      const g = useGame.getState()
+      if (g.voidRound === 'active' && voidRemainingMs(g.voidRoundStartedAt) <= 0) {
+        g.endVoidRound()
+      }
+    }
+
+    const d = practice?.paused || frozen ? 0 : practice?.coarseStep ? 0.05 : Math.min(delta, 0.05)
+    if (!practice && !frozen) spawnAcc.current += d
     while (spawnAcc.current >= SPAWN_INTERVAL) {
       spawnAcc.current -= SPAWN_INTERVAL
       for (let n = 0; n < SPAWN_BURST; n++) spawnAsteroid(ship)
     }
 
     const keys = getKeys()
-    const firing = keys.fire || useInput.getState().fire
+    const firing = !frozen && (keys.fire || useInput.getState().fire)
     fireCooldown.current = Math.max(0, fireCooldown.current - d)
     if ((firing && fireCooldown.current === 0) || (practice && practice.shot !== testShot.current)) {
       fireLaser(ship)

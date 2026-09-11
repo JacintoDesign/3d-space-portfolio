@@ -115,6 +115,7 @@ export default function App() {
         else if (g.mode === 'overlay') g.closeOverlay()
         else if (g.mode === 'about') g.closeAbout()
         else if (g.mode === 'contact') g.closeContact()
+        else if (g.mode === 'play' && g.voidRound === 'over') g.restartVoidRound()
         else if (g.mode === 'play' && g.parked) g.resumeFlight()
       } else if (e.code === 'KeyP' && !typing && (g.mode === 'play' || g.photoMode)) {
         g.togglePhotoMode()
