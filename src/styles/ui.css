@@ -328,6 +328,82 @@
   letter-spacing: 0.12em;
 }
 
+.void-results-scrim {
+  z-index: 45;
+}
+.void-results {
+  width: min(440px, 100%);
+}
+.void-results-score {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 8px 0 22px;
+  padding: 16px 18px;
+  border: 1px solid rgba(255, 106, 61, 0.4);
+  background: rgba(255, 106, 61, 0.08);
+}
+.void-results-score .tag {
+  font-size: 10px;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: #ff8844;
+}
+.void-results-score .value {
+  font-size: clamp(36px, 6vw, 52px);
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  text-shadow: 0 0 22px rgba(255, 102, 34, 0.55);
+}
+.void-results-score .rank {
+  margin-top: 6px;
+  font-size: 11px;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--accent, #ff6a3d);
+}
+.void-scoreboard {
+  list-style: none;
+  margin: 0 0 22px;
+  padding: 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+.void-scoreboard li {
+  display: grid;
+  grid-template-columns: 28px 1fr auto;
+  gap: 12px;
+  align-items: baseline;
+  padding: 10px 4px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  font-variant-numeric: tabular-nums;
+}
+.void-scoreboard li.current {
+  color: #fff;
+  background: rgba(255, 106, 61, 0.1);
+  box-shadow: inset 3px 0 0 var(--accent, #ff6a3d);
+  padding-left: 10px;
+}
+.void-scoreboard li.empty {
+  display: block;
+  color: var(--text-dim);
+}
+.void-scoreboard .place {
+  color: var(--text-dim);
+  font-size: 12px;
+  letter-spacing: 0.12em;
+}
+.void-scoreboard .pts {
+  font-weight: 700;
+  letter-spacing: 0.06em;
+}
+.void-scoreboard .when {
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  color: var(--text-dim);
+}
+
 /* About stats */
 .stats {
   display: grid;
@@ -808,6 +884,22 @@
   text-shadow: 0 0 12px rgba(255, 102, 34, 0.85);
   font-variant-numeric: tabular-nums;
 }
+.void-score .clock {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  letter-spacing: 0.22em;
+  color: #ffb089;
+  font-variant-numeric: tabular-nums;
+}
+.void-score .clock.low {
+  color: var(--neon-pink);
+  text-shadow: 0 0 10px rgba(255, 42, 109, 0.7);
+  animation: voidClockPulse 0.7s ease-in-out infinite;
+}
+@keyframes voidClockPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
+}
 
 .throttle {
   position: static;
@@ -923,6 +1015,9 @@
   }
   .void-score .value {
     font-size: 20px;
+  }
+  .void-score .clock {
+    font-size: 11px;
   }
   .radar {
     top: auto;
@@ -1498,7 +1593,8 @@
   .cine-course,
   .cine-copy h2,
   .ap-chip .ap-tag,
-  .target-readout {
+  .target-readout,
+  .void-score .clock.low {
     animation: none !important;
   }
 }

@@ -26,6 +26,7 @@ export function MobileControls() {
   const parked = useGame((s) => s.parked)
   const zone = useGame((s) => s.zone)
   const voidWarp = useGame((s) => s.voidWarp)
+  const voidRound = useGame((s) => s.voidRound)
   const setSteer = useInput((s) => s.setSteer)
   const setMobileAimLock = useInput((s) => s.setMobileAimLock)
   const clearMobileAimLock = useInput((s) => s.clearMobileAimLock)
@@ -49,7 +50,7 @@ export function MobileControls() {
   const lastAimX = useRef(0)
   const lastAimY = useRef(0)
 
-  const inBelt = zone === 'void' && !voidWarp
+  const inBelt = zone === 'void' && !voidWarp && voidRound !== 'over'
 
   const beginActionHold = (lockAim = false) => {
     actionHoldCount.current += 1

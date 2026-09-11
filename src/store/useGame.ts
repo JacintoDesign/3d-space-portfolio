@@ -15,6 +15,67 @@ export const VOID_ASTEROID_SCORES: Record<AsteroidSizeTier, number> = {
   large: 100,
 }
 
+export const VOID_ROUND_MS = 60_000
+export const VOID_SCORES_KEY = 'jd-void-scores'
+export const VOID_SCORES_MAX = 3
+
+export type VoidRound = 'idle' | 'active' | 'over'
+
+export interface VoidScoreEntry {
+  score: number
+  at: number
+}
+
+export function formatVoidClock(ms: number) {
+  const total = Math.max(0, Math.ceil(ms / 1000))
+  const m = Math.floor(total / 60)
+  const s = total % 60
+  return `${m}:${s.toString().padStart(2, '0')}`
+}
+
+export function voidRemainingMs(startedAt: number | null, now = performance.now()) {
+  if (startedAt == null) return 0
+  return Math.max(0, VOID_ROUND_MS - (now - startedAt))
+}
+
+function readVoidScores(): VoidScoreEntry[] {
+  try {
+    const raw = localStorage.getItem(VOID_SCORES_KEY)
+    if (!raw) return []
+    const parsed = JSON.parse(raw) as unknown
+    if (!Array.isArray(parsed)) return []
+    return parsed
+      .flatMap((entry) => {
+        if (!entry || typeof entry !== 'object') return []
+        const score = (entry as VoidScoreEntry).score
+        const at = (entry as VoidScoreEntry).at
+        if (typeof score !== 'number' || !Number.isFinite(score)) return []
+        return [{ score: Math.max(0, Math.floor(score)), at: typeof at === 'number' ? at : 0 }]
+      })
+      .sort((a, b) => b.score - a.score || b.at - a.at)
+      .slice(0, VOID_SCORES_MAX)
+  } catch {
+    return []
+  }
+}
+
+function writeVoidScores(scores: VoidScoreEntry[]) {
+  try {
+    localStorage.setItem(VOID_SCORES_KEY, JSON.stringify(scores.slice(0, VOID_SCORES_MAX)))
+  } catch {
+    /* private mode / quota */
+  }
+}
+
+function recordVoidScore(score: number): { scores: VoidScoreEntry[]; at: number } {
+  const at = Date.now()
+  const scores = [...readVoidScores(), { score, at }]
+    .sort((a, b) => b.score - a.score || b.at - a.at)
+    .slice(0, VOID_SCORES_MAX)
+  writeVoidScores(scores)
+  return { scores, at }
+}
+
 /**
  * Leaving an About/Contact warp cinematic routes the ship home through the
  * gateway to a project. Pick the station nearest the gateway (so the nebula-side
@@ -87,6 +148,16 @@ interface GameState {
   muted: boolean
   /** Asteroids destroyed in the current void belt run. */
   voidScore: number
+  /** Timed asteroid-belt round: idle until drop-out, then one minute on the clock. */
+  voidRound: VoidRound
+  /** performance.now() when the current minute started. */
+  voidRoundStartedAt: number | null
+  /** Bumps on drop-out / restart so VoidCombat reseeds the field. */
+  voidRoundTick: number
+  /** High scores persisted in localStorage. */
+  voidHighScores: VoidScoreEntry[]
+  /** Timestamp of the run that just finished — used to highlight it on the board. */
+  voidLastRunAt: number | null
   /** Bumps on goHome — Ship + ChaseCamera snap back to the spawn pose. */
   homeTick: number
 
@@ -111,6 +182,10 @@ interface GameState {
   dismissControls: () => void
   toggleMuted: () => void
   addVoidScore: (points: number) => void
+  /** Persist the current score and open the high-score board. */
+  endVoidRound: () => void
+  /** Clear the field and start a fresh minute in the belt. */
+  restartVoidRound: () => void
   /** Reset to the initial nebula spawn view — ship pose, zone, overlays, autopilot. */
   goHome: () => void
 }
@@ -131,6 +206,11 @@ export const useGame = create<GameState>((set, get) => ({
   photoMode: false,
   muted: true,
   voidScore: 0,
+  voidRound: 'idle',
+  voidRoundStartedAt: null,
+  voidRoundTick: 0,
+  voidHighScores: readVoidScores(),
+  voidLastRunAt: null,
   homeTick: 0,
 
   setReady: () => set((s) => (s.mode === 'loading' ? { mode: 'play' } : {})),
@@ -188,6 +268,10 @@ export const useGame = create<GameState>((set, get) => ({
       nearTarget: null,
       zone: 'void',
       voidWarp: false,
+      voidScore: 0,
+      voidRound: 'idle',
+      voidRoundStartedAt: null,
+      voidLastRunAt: null,
       transit: s.zone === 'void' ? s.transit : s.transit + 1,
     }))
   },
@@ -209,6 +293,10 @@ export const useGame = create<GameState>((set, get) => ({
       nearTarget: null,
       zone: 'void',
       voidWarp: false,
+      voidScore: 0,
+      voidRound: 'idle',
+      voidRoundStartedAt: null,
+      voidLastRunAt: null,
       transit: s.zone === 'void' ? s.transit : s.transit + 1,
     }))
   },
@@ -227,7 +315,10 @@ export const useGame = create<GameState>((set, get) => ({
         zone: enteringVoid ? 'void' : 'nebula',
         voidWarp: enteringVoid,
         transit: s.transit + 1,
-        voidScore: enteringVoid ? 0 : s.voidScore,
+        voidScore: 0,
+        voidRound: 'idle',
+        voidRoundStartedAt: null,
+        voidLastRunAt: null,
       }
     })
   },
@@ -236,7 +327,14 @@ export const useGame = create<GameState>((set, get) => ({
     if (!get().voidWarp || get().zone !== 'void') return
     playConfirm()
     if (get().isMobile) buzz(40)
-    set({ voidWarp: false, voidScore: 0 })
+    set((s) => ({
+      voidWarp: false,
+      voidScore: 0,
+      voidRound: 'active',
+      voidRoundStartedAt: performance.now(),
+      voidRoundTick: s.voidRoundTick + 1,
+      voidLastRunAt: null,
+    }))
   },
 
   dismissControls: () => {
@@ -250,7 +348,36 @@ export const useGame = create<GameState>((set, get) => ({
 
   toggleMuted: () => set((s) => ({ muted: !s.muted })),
 
-  addVoidScore: (points) => set((s) => ({ voidScore: s.voidScore + points })),
+  addVoidScore: (points) => {
+    if (get().voidRound === 'over') return
+    set((s) => ({ voidScore: s.voidScore + points }))
+  },
+
+  endVoidRound: () => {
+    const s = get()
+    if (s.voidRound !== 'active') return
+    const { scores, at } = recordVoidScore(s.voidScore)
+    playConfirm()
+    if (s.isMobile) buzz([20, 40, 70])
+    set({
+      voidRound: 'over',
+      voidHighScores: scores,
+      voidLastRunAt: at,
+    })
+  },
+
+  restartVoidRound: () => {
+    const s = get()
+    if (s.zone !== 'void' || s.voidWarp) return
+    playConfirm()
+    set({
+      voidScore: 0,
+      voidRound: 'active',
+      voidRoundStartedAt: performance.now(),
+      voidRoundTick: s.voidRoundTick + 1,
+      voidLastRunAt: null,
+    })
+  },
 
   goHome: () => {
     const s = get()
@@ -265,6 +392,9 @@ export const useGame = create<GameState>((set, get) => ({
       zone: 'nebula',
       voidWarp: false,
       voidScore: 0,
+      voidRound: 'idle',
+      voidRoundStartedAt: null,
+      voidLastRunAt: null,
       homeTick: s.homeTick + 1,
     })
   },

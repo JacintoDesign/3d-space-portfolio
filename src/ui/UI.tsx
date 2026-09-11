@@ -4,6 +4,7 @@ import { setMuted } from '../audio/ambience'
 import { Loader } from './Loader'
 import { InteractPrompt } from './InteractPrompt'
 import { OverlayRoot } from './overlays/OverlayRoot'
+import { VoidResults } from './overlays/VoidResults'
 import { ControlsTutorial } from './ControlsTutorial'
 import { MobileControls } from './MobileControls'
 import { Hud } from './Hud'
@@ -97,6 +98,7 @@ export function UI() {
           {photoMode && <PhotoHint />}
           {/* Overlays + cinematics + warp flash stay available regardless. */}
           <OverlayRoot />
+          <VoidResults />
           <AboutCinematic />
           <ContactCinematic />
           <WarpFlash />
