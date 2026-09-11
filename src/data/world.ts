@@ -50,17 +50,18 @@ function projectStation(
 }
 
 /**
- * Flight corridor. The five project stations stagger left/right at varied depth +
+ * Flight corridor. The six project stations stagger left/right at varied depth +
  * height down a curving lane through the nebula, ordered like the portfolio grid
  * (VibeMail first). A derelict gateway-ring (see Sector) looms behind the lane
  * as the hero landmark. (About is not a station — it's the warp cinematic.)
  */
 export const LANDMARKS: Landmark[] = [
   projectStation('vibemail', [-26, -2, -11], 5, 23),
-  projectStation('waypoint', [29, 9, -42], 5, 37),
-  projectStation('music-player', [-31, 3, -74], 5, 41),
-  projectStation('scoundrel', [27, -9, -106], 5, 53),
-  projectStation('recipes', [-29, 6, -138], 5, 67),
+  projectStation('astra', [29, 9, -36], 5, 37),
+  projectStation('mars', [-31, 3, -62], 5, 41),
+  projectStation('cosmos', [27, -9, -87], 5, 53),
+  projectStation('periodical', [-29, 6, -113], 5, 67),
+  projectStation('cube', [30, -4, -138], 5, 79),
 ]
 
 export const landmarkById = (id: string) => LANDMARKS.find((l) => l.id === id)

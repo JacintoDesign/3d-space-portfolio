@@ -39,17 +39,23 @@ export function AboutCinematic() {
           ))}
         </div>
 
-        <a
-          className="cine-course"
-          href={about.course.url}
-          target="_blank"
-          rel="noreferrer"
-          style={{ animationDelay: '1.7s' }}
-        >
-          <span className="cc-label">{about.course.label}</span>
-          <span className="cc-title">{about.course.title}</span>
-          <span className="cc-link">{about.course.linkLabel} ↗</span>
-        </a>
+        <div className="cine-courses">
+          {about.courses.map((course, i) => (
+            <a
+              className="cine-course"
+              key={course.url}
+              href={course.url}
+              target="_blank"
+              rel="noreferrer"
+              style={{ animationDelay: `${1.7 + i * 0.18}s` }}
+            >
+              <span className="cc-label">{course.label}</span>
+              <span className="cc-title">{course.title}</span>
+              <span className="cc-blurb">{course.blurb}</span>
+              <span className="cc-link">{course.linkLabel} ↗</span>
+            </a>
+          ))}
+        </div>
 
         <p className="cine-hint">ESC — return to the stick</p>
       </div>

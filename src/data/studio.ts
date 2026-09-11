@@ -21,14 +21,24 @@ export const STUDIO = {
       { label: 'Years teaching developers', value: '5+' },
       { label: 'Projects created', value: '100+' },
     ],
-    course: {
-      label: 'Latest course',
-      title: 'The Vibe Coding Bootcamp: Become an AI-Augmented Developer',
-      blurb:
-        'An AI-first path into tech — master tools like Cursor, Copilot, Claude and Gemini, direct your vision, build real projects, and create a job-ready portfolio. Live on Zero to Mastery.',
-      url: 'https://zerotomastery.io/courses/learn-vibe-coding/',
-      linkLabel: 'View the course',
-    },
+    courses: [
+      {
+        label: 'Foundational course',
+        title: 'The Vibe Coding Bootcamp: Become an AI-Augmented Developer',
+        blurb:
+          'An AI-first path into tech — master Cursor, Copilot, Claude and Gemini, direct the work, and ship a job-ready portfolio. Live on Zero to Mastery.',
+        url: 'https://academy.zerotomastery.io/a/aff_s02b4247/external?affcode=441520_7lacw2wa',
+        linkLabel: 'View the course',
+      },
+      {
+        label: 'Latest course',
+        title: 'The Claude Code Bootcamp: Design, Build, Test and Deploy with Claude',
+        blurb:
+          'Master Claude Code and Claude Design to plan, build, test and deploy production-ready web apps — from backend architecture to motion-rich interfaces. Live on Zero to Mastery.',
+        url: 'https://zerotomastery.io/courses/claude-code-bootcamp/',
+        linkLabel: 'View the course',
+      },
+    ],
   },
   contact: {
     sign: 'CONTACT',
