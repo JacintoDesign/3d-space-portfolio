@@ -1256,13 +1256,19 @@
   text-transform: uppercase;
   color: var(--text-dim);
 }
+.cine-courses {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 24px 0 0;
+  max-width: 460px;
+}
 .cine-course {
   display: flex;
   flex-direction: column;
   gap: 5px;
-  margin: 24px 0 0;
+  margin: 0;
   padding: 14px 16px;
-  max-width: 460px;
   border: 1px solid rgba(5, 217, 232, 0.28);
   border-left: 3px solid var(--neon-cyan);
   border-radius: 2px;
@@ -1288,6 +1294,11 @@
   font-weight: 700;
   line-height: 1.4;
   color: #fff;
+}
+.cine-course .cc-blurb {
+  font-size: 12px;
+  line-height: 1.55;
+  color: #c5c9e8;
 }
 .cine-course .cc-link {
   font-size: 11px;
@@ -1484,6 +1495,7 @@
   .waypoint,
   .cine-body,
   .cine-stat,
+  .cine-course,
   .cine-copy h2,
   .ap-chip .ap-tag,
   .target-readout {

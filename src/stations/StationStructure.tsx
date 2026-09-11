@@ -145,7 +145,7 @@ function relay(h: Hardware) {
   reflector(h, [0, 0.76, -0.08], 0.39)
 }
 
-/** Waypoint: a single horizontal observatory ring, with a fixed hub and spokes. */
+/** Astra: a single horizontal observatory ring, with a fixed hub and spokes. */
 function observatory(h: Hardware) {
   h.add('hull', new THREE.CylinderGeometry(0.27, 0.32, 0.95, 12), [0, -0.215, 0])
   h.add('glass', new THREE.SphereGeometry(0.265, 24, 12, 0, TAU, 0, HALF_PI), [0, 0.265, 0])
@@ -164,7 +164,7 @@ function observatory(h: Hardware) {
   h.box('light', [0.03, 0.12, 0.03], [0, 1.08, -0.85])
 }
 
-/** ZTM Music: two large resonator barrels and a stepped equalizer radiator. */
+/** Cosmos: two large resonator barrels and a stepped equalizer radiator. */
 function soundDock(h: Hardware) {
   cabin(h, [0, -0.05, 0.03], [0.5, 0.48, 0.74])
   h.box('frame', [2.1, 0.12, 0.15], [0, -0.08, -0.25])
@@ -190,7 +190,7 @@ function soundDock(h: Hardware) {
   h.beam([0, 0.16, -0.3], [0, 0.4, -0.42], 0.045)
 }
 
-/** Scoundrel: an open forked salvage gantry, with offset bridge and a crane. */
+/** Periodical: an open forked press gantry, with offset bridge and a crane. */
 function salvage(h: Hardware) {
   h.box('hull', [2.1, 0.25, 0.34], [0, -0.13, -0.48])
   cabin(h, [-0.7, 0.18, -0.47], [0.52, 0.35, 0.38])
@@ -218,7 +218,7 @@ function salvage(h: Hardware) {
   h.box('hull', [0.45, 0.33, 0.75], [0, -0.23, 0.06])
 }
 
-/** Recipes: three domed cultivation pods, with clear service lanes between them. */
+/** Mars Colony: three domed cultivation pods, with clear service lanes between them. */
 function greenhouse(h: Hardware) {
   const spacing = 0.78 // Pod outer diameter .60: .18-wide service lanes.
   h.box('frame', [2.12, 0.1, 0.13], [0, -0.16, -0.4])
@@ -240,6 +240,39 @@ function greenhouse(h: Hardware) {
   }
   h.box('frame', [0.2, 0.1, 0.2], [0, -0.18, 0.12])
   h.box('hull', [0.4, 0.28, 0.34], [0, -0.24, 0.34])
+}
+
+/** Cube Lab: a 3×3 puzzle core with face-lit cells and outboard sails. */
+function cubeLab(h: Hardware) {
+  const cell = 0.2
+  const pitch = 0.236
+  const cy = 0
+  const cz = -0.16
+  for (let ix = -1; ix <= 1; ix++) {
+    for (let iy = -1; iy <= 1; iy++) {
+      for (let iz = -1; iz <= 1; iz++) {
+        const x = ix * pitch
+        const y = cy + iy * pitch
+        const z = cz + iz * pitch
+        h.box('hull', [cell, cell, cell], [x, y, z])
+        if (Math.abs(ix) + Math.abs(iy) + Math.abs(iz) === 3) {
+          h.box('gold', [cell * 0.42, cell * 0.42, cell * 0.42], [x, y, z])
+        }
+      }
+    }
+  }
+  const face = pitch + cell / 2 + 0.012
+  h.box('light', [cell * 0.55, cell * 0.55, 0.02], [0, cy, cz + face])
+  h.box('light', [cell * 0.55, cell * 0.55, 0.02], [0, cy, cz - face])
+  h.box('light', [0.02, cell * 0.55, cell * 0.55], [face, cy, cz])
+  h.box('light', [0.02, cell * 0.55, cell * 0.55], [-face, cy, cz])
+  h.box('light', [cell * 0.55, 0.02, cell * 0.55], [0, cy + face, cz])
+  h.box('light', [cell * 0.55, 0.02, cell * 0.55], [0, cy - face, cz])
+  h.box('frame', [0.14, 0.14, 0.42], [0, cy, cz - 0.62])
+  for (const side of [-1, 1] as const) {
+    h.beam([side * 0.22, cy, cz - 0.35], [side * 0.78, cy + 0.15, cz - 0.62], 0.022)
+    sail(h, [side * 0.92, cy + 0.08, cz - 0.62], 0.52, 1.24)
+  }
 }
 
 /** Only the observatory rim rotates; its spokes, sensor mast, and dock stay fixed. */
@@ -265,13 +298,14 @@ function ObservatoryRim({ color, phase }: { color: string; phase?: number }) {
 
 const BUILDERS: Record<string, (h: Hardware) => void> = {
   vibemail: relay,
-  waypoint: observatory,
-  'music-player': soundDock,
-  scoundrel: salvage,
-  recipes: greenhouse,
+  astra: observatory,
+  mars: greenhouse,
+  cosmos: soundDock,
+  periodical: salvage,
+  cube: cubeLab,
 }
 const HULLS: Record<string, string> = {
-  vibemail: '#b6c9dc', waypoint: '#a7b8c5', 'music-player': '#918baf', scoundrel: '#8e8674', recipes: '#c6d6bd',
+  vibemail: '#b6c9dc', astra: '#a7b8c5', mars: '#c6d6bd', cosmos: '#918baf', periodical: '#8e8674', cube: '#c5b4c8',
 }
 
 export function StationStructure({ id, color, radius, phase }: { id: string; color: string; radius: number; phase?: number }) {
@@ -284,7 +318,7 @@ export function StationStructure({ id, color, radius, phase }: { id: string; col
   return (
     <group scale={radius}>
       <BakedHardware parts={parts} color={color} hull={HULLS[id]} />
-      {id === 'waypoint' && <ObservatoryRim color={color} phase={phase} />}
+      {id === 'astra' && <ObservatoryRim color={color} phase={phase} />}
     </group>
   )
 }

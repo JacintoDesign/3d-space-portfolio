@@ -63,7 +63,7 @@ export function Station({ landmark }: { landmark: Landmark }) {
         <meshBasicMaterial transparent opacity={0} depthWrite={false} />
       </mesh>
       <StationStructure id={landmark.refId ?? landmark.id} radius={R} color={color} />
-      {landmark.id === 'waypoint' && <>
+      {landmark.id === 'astra' && <>
         <SurveySatellite radius={R} />
         <SurveySatellite radius={R} phase={Math.PI} />
       </>}
