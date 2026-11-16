@@ -5,10 +5,10 @@ An immersive, **3D playable portfolio** for a one-person studio. Pilot a fighter
 ## Experience
 
 - **Loader** → "Launch into the Nebula" gate (unlocks synthesized space ambience), then a **cinematic fly-in** that reveals the whole sector before settling into the chase
-- **Shareable + resilient** → **deep-links** (`/#recipes` opens that project on load; the URL tracks what you're viewing), a rich **social share card** (`og.jpg`), and a graceful **static fallback** (a full mini-portfolio) if WebGL is unavailable — never a blank screen
+- **Shareable + resilient** → **deep-links** (`/#cosmos` opens that project on load; the URL tracks what you're viewing), a rich **social share card** (`og.jpg`), and a graceful **static fallback** (a full mini-portfolio) if WebGL is unavailable — never a blank screen
 - **Photo mode** (`P`) → hides all HUD/nav chrome; drag to frame and screenshot. Respects **reduced-motion** (calms the auto-orbit + warp flash) and buzzes light **haptics** on dock/transit (mobile)
 - **Arcade flight** → auto-leveling, banking ship with an **attitude limiter**: the nose soft-stops short of vertical and eases back to the horizon (HUD shows "ATTITUDE ASSIST"), so the ship can never flip onto its back; hitting the sector edge engages an **autopilot to the nearest unvisited station**, so the boundary always aims you at content
-- **Stations** → five different architectures: VibeMail's tall solar sails and parabolic communications dish; Waypoint's observatory on a rotating lower rim; ZTM Music's twin resonators and stepped radiator; Scoundrel's open salvage gantry and crane; and Recipes' three greenhouse domes. Stationary hardware is kept outside the observatory rim's swept volume, with fixed spokes and a separate bearing. Cargo bins and cultivation pods have clear service gaps. Repeated hardware is merged by material to keep draw calls low.
+- **Stations** → six procedural stations, each built to show what its project is: **VibeMail** is an envelope with a scrolling inbox of thread cards and a search lens; **Astra** is an orbital observatory with a rotating ring and telescope above a banded gas planet; **Mars Colony** is a rust-red rock with pressurised domes, a mining derrick, rovers and a solar farm; **Cosmos** is a mapped globe with a tiny ISS orbiting it, ringed by glass dashboard widgets; **Periodical** is three numbered magazine volumes under a lectern whose page keeps turning; **Cube Lab** is a full-colour Rubik's cube whose top layer keeps twisting. Repeated hardware is merged by material to keep draw calls low.
 - **Station readouts** → camera-facing Japanese blade signs and overhead project holograms stay clear of the hull from every approach. Arrival framing fits the full station on portrait screens; observatory rotation, satellites, and hologram motion respect reduced-motion preferences.
 - **Moon** → a big **procedural shader moon** (fbm maria + cratering, a lit crescent, nebula-tinted limb) hangs in the midground beyond the gate for depth — no texture files
 - **Asteroid belt** → drop out of warp with `B`, then hold `Space` (or FIRE on mobile) to shoot. Three cratered rock shapes tumble without changing size. Large rocks split into three medium chunks; medium rocks split into two small chunks; small rocks become debris. Fragments inherit momentum, remain shootable, and award 100 / 50 / 10 points by size. Swept collision checks catch fast shots between frames, and short impact flashes keep the fragments visible.
@@ -57,6 +57,11 @@ No physics engine — arcade flight, proximity docking, and station collision ar
 - **Satellite** — **Poly by Google** via poly.pizza (CC-BY). The original bundled comms dish is retained as an unused source asset; the relay now uses a procedural reflector.
 - **Cargo depot** — unused bundled source asset by **Kay Lousberg** via poly.pizza (CC0). Unused station, dish, and cargo GLBs are not preloaded.
 
+## Project docs
+
+- [CONTRACT.md](CONTRACT.md) — the idea behind the project and what it must always do
+- [CLAUDE.md](CLAUDE.md) — working guide: structure, rules, and testing notes
+
 ## Develop
 
 ```bash
@@ -73,13 +78,13 @@ Deploy `dist/` to any static host (Vercel config included in `vercel.json`).
 
 - **Projects / studio copy** — `src/data/projects.ts`, `src/data/studio.ts`
 - **Station layout & flight bounds** — `src/data/world.ts`
-- **Station modeling** — hulls, solar arrays, and habitat wheels in `src/stations/StationStructure.tsx`; mounted props, interaction, and hologram placement in `src/stations/Station.tsx`
+- **Station modeling** — one builder per project (plus its animated parts) in `src/stations/StationStructure.tsx`; mounted props, interaction, and hologram placement in `src/stations/Station.tsx`
 - **Screenshots** — `public/images/<name>.jpg`, referenced from `projects.ts` (overlay hero + holo screen)
 - **Demo clips** — drop `public/videos/<id>.mp4` (matches a project `id`) to replace the screenshot / procedural screen
 
 ### Development inspection
 
-- `http://localhost:5173/?station-lab` — inspect the actual station assemblies from seven angles, orbit freely, and advance or animate the observatory rim.
+- `http://localhost:5173/?station-lab` — inspect the actual station assemblies from seven angles, orbit freely, and freeze, step or animate each station's moving parts.
 - `http://localhost:5173/?combat-lab` — fire real projectiles at a controlled target, inspect each fragmentation stage and score, or test a small target with 50 ms simulation steps.
 
 These inspection screens are development-only and excluded from the production build.
